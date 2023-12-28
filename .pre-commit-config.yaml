@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: rust-format
+        name: Format all rust files to keep them consistent
+        entry: rustfmt -l
+        files: \.rs$
+        stages: [ commit ]
+        language: system

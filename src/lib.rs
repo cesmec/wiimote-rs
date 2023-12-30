@@ -1,14 +1,13 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+#![allow(clippy::module_name_repetitions)]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod result;
+mod wiimote;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub const WIIMOTE_REPORT_BUFFER_SIZE: usize = 32;
+
+pub mod prelude {
+    pub use crate::result::*;
+    pub use crate::wiimote::*;
+    pub use crate::WIIMOTE_REPORT_BUFFER_SIZE;
+    pub use hidapi::*;
 }

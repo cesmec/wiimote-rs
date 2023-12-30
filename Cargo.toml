@@ -6,6 +6,9 @@ license = "MIT"
 authors = ["cesmec"]
 
 [dependencies]
+crossbeam-channel = "0.5"
+# Use hidraw instead of libusb for bluetooth devices
+hidapi = { version = "2.4", features = ["linux-static-hidraw"], default-features = false }
 
 [build-dependencies]
 cc = "1.0"

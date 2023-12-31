@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::wiimote::simple_io;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WiimoteDeviceType {
@@ -8,7 +9,7 @@ pub enum WiimoteDeviceType {
     WiimotePlus = 1,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct AccelererometerCalibrationData {
     x_zero_offset: u16,
     y_zero_offset: u16,
@@ -40,14 +41,16 @@ impl WiimoteDevice {
 
         let serial = device_info.serial_number().unwrap_or("");
         let hid_device = device_info.open_device(hid_api)?;
-        let calibration_data = Self::read_calibration_data(&hid_device)?;
 
-        Ok(Self {
+        let mut wiimote = Self {
             hid_device: Some(hid_device),
             serial_number: serial.to_string(),
             device_type,
-            calibration_data,
-        })
+            calibration_data: AccelererometerCalibrationData::default(),
+        };
+
+        wiimote.initialize()?;
+        Ok(wiimote)
     }
 
     /// Checks that the device is a Wii remote.
@@ -95,6 +98,7 @@ impl WiimoteDevice {
         let hid_device = device_info.open_device(hid_api)?;
         self.device_type = device_type;
         self.hid_device = Some(hid_device);
+        self.initialize()?;
         Ok(())
     }
 
@@ -137,51 +141,33 @@ impl WiimoteDevice {
         }
     }
 
-    fn read_calibration_data(
-        hid_device: &HidDevice,
-    ) -> WiimoteResult<AccelererometerCalibrationData> {
+    fn initialize(&mut self) -> WiimoteResult<()> {
+        self.calibration_data = self.read_calibration_data()?;
+        Ok(())
+    }
+
+    fn read_calibration_data(&self) -> WiimoteResult<AccelererometerCalibrationData> {
         // https://www.wiibrew.org/wiki/Wiimote#EEPROM_Memory
         // The four bytes starting at 0x0016 and 0x0020 store the calibrated zero offsets for the accelerometer
         // (high 8 bits of X,Y,Z in the first three bytes, low 2 bits packed in the fourth byte as --XXYYZZ).
         // The four bytes at 0x001A and 0x24 store the force of gravity on those axes.
-        let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+        let data = simple_io::read_16_bytes_sync_checked(self, Addressing::eeprom(0x0016, 10))?;
 
-        let read_request = OutputReport::ReadMemory(Addressing::eeprom(0x0016, 10));
-        read_request.fill_buffer(false, &mut buffer);
-
-        hid_device.write(&buffer)?;
-
-        let bytes_read = hid_device.read_timeout(&mut buffer, 100)?;
-        if bytes_read < 16 {
-            return Err(WiimoteDeviceError::InvalidData.into());
+        let mut checksum = 0x55u8;
+        for byte in &data[..9] {
+            checksum = checksum.wrapping_add(*byte);
+        }
+        if checksum != data[9] {
+            return Err(WiimoteDeviceError::InvalidChecksum.into());
         }
 
-        let input_report = InputReport::try_from(buffer)?;
-        if let InputReport::ReadMemory(memory_data) = input_report {
-            if memory_data.address_offset() != 0x0016 || memory_data.size() != 10 {
-                return Err(WiimoteDeviceError::InvalidData.into());
-            }
-
-            let data = memory_data.data;
-            let mut checksum = 0x55u8;
-            for byte in &data[..9] {
-                checksum = checksum.wrapping_add(*byte);
-            }
-
-            if checksum != data[9] {
-                return Err(WiimoteDeviceError::InvalidData.into());
-            }
-
-            Ok(AccelererometerCalibrationData {
-                x_zero_offset: ((data[0] as u16) << 2) | ((data[3] as u16) >> 4 & 0b11),
-                y_zero_offset: ((data[1] as u16) << 2) | ((data[3] as u16) >> 2 & 0b11),
-                z_zero_offset: ((data[2] as u16) << 2) | ((data[3] as u16) & 0b11),
-                x_gravity: ((data[4] as u16) << 2) | ((data[7] as u16) >> 4 & 0b11),
-                y_gravity: ((data[5] as u16) << 2) | ((data[7] as u16) >> 2 & 0b11),
-                z_gravity: ((data[6] as u16) << 2) | ((data[7] as u16) & 0b11),
-            })
-        } else {
-            Err(WiimoteDeviceError::InvalidData.into())
-        }
+        Ok(AccelererometerCalibrationData {
+            x_zero_offset: ((data[0] as u16) << 2) | ((data[3] as u16) >> 4 & 0b11),
+            y_zero_offset: ((data[1] as u16) << 2) | ((data[3] as u16) >> 2 & 0b11),
+            z_zero_offset: ((data[2] as u16) << 2) | ((data[3] as u16) & 0b11),
+            x_gravity: ((data[4] as u16) << 2) | ((data[7] as u16) >> 4 & 0b11),
+            y_gravity: ((data[5] as u16) << 2) | ((data[7] as u16) >> 2 & 0b11),
+            z_gravity: ((data[6] as u16) << 2) | ((data[7] as u16) & 0b11),
+        })
     }
 }

@@ -33,8 +33,8 @@ pub struct DataReporingMode {
 pub struct Addressing {
     /// If true, read from control registers, otherwise from EEPROM.
     control_registers: bool,
-    address: u32,
-    size: u16,
+    pub(crate) address: u32,
+    pub(crate) size: u16,
 }
 
 impl Addressing {

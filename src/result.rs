@@ -17,6 +17,8 @@ impl From<HidError> for WiimoteError {
 pub enum WiimoteDeviceError {
     InvalidVendorID(u16),
     InvalidProductID(u16),
+    MissingData,
+    InvalidChecksum,
     InvalidData,
 }
 

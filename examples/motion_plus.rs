@@ -32,7 +32,7 @@ fn main() -> WiimoteResult<()> {
             let size = led_report.fill_buffer(false, &mut buffer);
             d.lock().unwrap().write(&buffer[..size]).unwrap();
 
-            {
+            let motion_plus_calibration = {
                 let wiimote = d.lock().unwrap();
                 if let Some(motion_plus) = wiimote.motion_plus() {
                     motion_plus.initialize(&wiimote).unwrap();
@@ -42,13 +42,14 @@ fn main() -> WiimoteResult<()> {
                 }
                 println!("Motion plus: {:?}", wiimote.motion_plus());
                 println!("Extension: {:?}", wiimote.extension());
-            }
+                wiimote.motion_plus().map(MotionPlus::calibration)
+            };
 
             loop {
                 let size = d.lock().unwrap().read_timeout(&mut buffer, 50).unwrap_or(0);
                 if size > 0 {
                     let report = InputReport::try_from(buffer).unwrap();
-                    handle_report(&report, &d);
+                    handle_report(&report, &motion_plus_calibration, &d);
                     tx.send(report).unwrap();
                 }
                 std::thread::sleep(Duration::from_millis(50));
@@ -61,7 +62,11 @@ fn main() -> WiimoteResult<()> {
     Ok(())
 }
 
-fn handle_report(report: &InputReport, d: &Arc<Mutex<WiimoteDevice>>) {
+fn handle_report(
+    report: &InputReport,
+    motion_plus_calibration: &Option<MotionPlusCalibration>,
+    d: &Arc<Mutex<WiimoteDevice>>,
+) {
     let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
 
     if let InputReport::StatusInformation(_) = report {
@@ -74,9 +79,14 @@ fn handle_report(report: &InputReport, d: &Arc<Mutex<WiimoteDevice>>) {
         let size = reporting_mode.fill_buffer(false, &mut buffer);
         d.lock().unwrap().write(&buffer[..size]).unwrap();
     } else if let InputReport::DataReport(0x35, wiimote_data) = &report {
-        let mut motion_plus_buffer = [0u8; 6];
-        motion_plus_buffer.copy_from_slice(&wiimote_data.data[5..11]);
+        if let Some(calibration) = &motion_plus_calibration {
+            let mut motion_plus_buffer = [0u8; 6];
+            motion_plus_buffer.copy_from_slice(&wiimote_data.data[5..11]);
 
-        println!("Motion plus: {motion_plus_buffer:0X?}");
+            if let Ok(motion_plus_data) = MotionPlusData::try_from(motion_plus_buffer) {
+                let (yaw, roll, pitch) = calibration.get_angular_velocity(&motion_plus_data);
+                print!("\rYaw: {yaw}, Roll: {roll}, Pitch: {pitch}               ");
+            }
+        }
     }
 }

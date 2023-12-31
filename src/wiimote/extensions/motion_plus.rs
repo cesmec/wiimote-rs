@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::sync::atomic::AtomicBool;
 
 use crate::prelude::*;
+use crate::wiimote::calibration::normalize;
 use crate::wiimote::simple_io;
 
 #[derive(Debug, Clone, Copy)]
@@ -22,6 +23,57 @@ pub enum MotionPlusType {
 pub struct MotionPlusCalibration {
     fast: MotionPlusCalibrationData,
     slow: MotionPlusCalibrationData,
+}
+
+impl MotionPlusCalibration {
+    #[must_use]
+    pub fn get_angular_velocity(&self, data: &MotionPlusData) -> (f32, f32, f32) {
+        // https://www.wiibrew.org/wiki/Wiimote/Extension_Controllers/Wii_Motion_Plus#Data_Format
+        const UNIT_PER_DEG_PER_S: f32 = 8192.0 / 595.0;
+        const HIGH_SPEED_MULTIPLIER: f32 = 2000.0 / 440.0;
+
+        #[rustfmt::skip]
+        let calibration = (
+            if data.yaw_slow { &self.slow } else { &self.fast },
+            if data.roll_slow { &self.slow } else { &self.fast },
+            if data.pitch_slow { &self.slow } else { &self.fast },
+        );
+
+        // At high speed (slow bit = 0) raw values read are small with the same deg/s to reach
+        // higher values on top, so you must multiply it by 2000/440
+        #[rustfmt::skip]
+        let mode_multiplier = (
+            if data.yaw_slow { 1.0 } else { HIGH_SPEED_MULTIPLIER },
+            if data.roll_slow { 1.0 } else { HIGH_SPEED_MULTIPLIER },
+            if data.pitch_slow { 1.0 } else { HIGH_SPEED_MULTIPLIER },
+        );
+
+        let scale = (
+            calibration.0.yaw_scale,
+            calibration.1.roll_scale,
+            calibration.2.pitch_scale,
+        );
+        let zero = (
+            calibration.0.yaw_zero_value,
+            calibration.1.roll_zero_value,
+            calibration.2.pitch_zero_value,
+        );
+        let degrees = (
+            calibration.0.degrees_div_6 as f32 * 6_f32,
+            calibration.1.degrees_div_6 as f32 * 6_f32,
+            calibration.2.degrees_div_6 as f32 * 6_f32,
+        );
+
+        let yaw: f32 = normalize(data.yaw, 14, zero.0, scale.0, 16);
+        let roll: f32 = normalize(data.roll, 14, zero.1, scale.1, 16);
+        let pitch: f32 = normalize(data.pitch, 14, zero.2, scale.2, 16);
+
+        (
+            yaw * degrees.0 * mode_multiplier.0 / UNIT_PER_DEG_PER_S,
+            roll * degrees.1 * mode_multiplier.1 / UNIT_PER_DEG_PER_S,
+            pitch * degrees.2 * mode_multiplier.2 / UNIT_PER_DEG_PER_S,
+        )
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -46,6 +98,42 @@ impl From<[u8; 16]> for MotionPlusCalibrationData {
             pitch_scale: u16::from_be_bytes([value[10], value[11]]),
             degrees_div_6: value[12],
         }
+    }
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug)]
+pub struct MotionPlusData {
+    pub yaw: u16,
+    pub roll: u16,
+    pub pitch: u16,
+    pub yaw_slow: bool,
+    pub roll_slow: bool,
+    pub pitch_slow: bool,
+    pub extension_connected: bool,
+}
+
+impl TryFrom<[u8; 6]> for MotionPlusData {
+    type Error = ();
+
+    fn try_from(value: [u8; 6]) -> Result<Self, Self::Error> {
+        // https://www.wiibrew.org/wiki/Wiimote/Extension_Controllers/Wii_Motion_Plus#Nunchuck_pass-through_mode
+        // Bit 1 of Byte 5 is used to determine which type of report is received:
+        // it is 1 when it contains MotionPlus Data and 0 when it contains extension data.
+        let is_motion_plus_data = value[5] & 0b10 == 0b10;
+        if !is_motion_plus_data {
+            return Err(());
+        }
+
+        Ok(Self {
+            yaw: u16::from_be_bytes([value[3] >> 2, value[0]]),
+            roll: u16::from_be_bytes([value[4] >> 2, value[1]]),
+            pitch: u16::from_be_bytes([value[5] >> 2, value[2]]),
+            yaw_slow: value[3] & 0b0010 != 0,
+            roll_slow: value[3] & 0b0001 != 0,
+            pitch_slow: value[4] & 0b0010 != 0,
+            extension_connected: value[4] & 0b0001 != 0,
+        })
     }
 }
 

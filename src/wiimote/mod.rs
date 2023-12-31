@@ -1,3 +1,4 @@
+mod calibration;
 mod device;
 pub mod extensions;
 pub mod input;

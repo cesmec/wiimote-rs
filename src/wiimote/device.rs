@@ -24,6 +24,7 @@ pub struct WiimoteDevice {
     serial_number: String,
     device_type: WiimoteDeviceType,
     calibration_data: AccelererometerCalibrationData,
+    motion_plus: Option<MotionPlus>,
     extension: Option<WiimoteExtension>,
 }
 
@@ -48,6 +49,7 @@ impl WiimoteDevice {
             serial_number: serial.to_string(),
             device_type,
             calibration_data: AccelererometerCalibrationData::default(),
+            motion_plus: None,
             extension: None,
         };
 
@@ -80,6 +82,11 @@ impl WiimoteDevice {
     #[must_use]
     pub const fn device_type(&self) -> WiimoteDeviceType {
         self.device_type
+    }
+
+    #[must_use]
+    pub const fn motion_plus(&self) -> Option<&MotionPlus> {
+        self.motion_plus.as_ref()
     }
 
     #[must_use]
@@ -149,9 +156,11 @@ impl WiimoteDevice {
     }
 
     fn initialize(&mut self) -> WiimoteResult<()> {
+        self.motion_plus = None;
         self.extension = None;
 
         self.calibration_data = self.read_calibration_data()?;
+        self.motion_plus = MotionPlus::detect(self)?;
         self.extension = WiimoteExtension::detect(self)?;
         Ok(())
     }

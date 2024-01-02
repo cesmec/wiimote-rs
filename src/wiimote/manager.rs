@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 use std::collections::{HashMap, HashSet};
-use std::option::Option::Some;
 use std::sync::{Arc, Mutex, Once};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -10,6 +9,13 @@ use super::device::WiimoteDevice;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct WiimoteSerialNumber(pub String);
+
+pub fn prepare_wiimote_connections() {
+    unsafe {
+        // Make Wii remotes discoverable to HID API
+        enable_wiimotes_hid_service();
+    }
+}
 
 extern "C" {
     fn enable_wiimotes_hid_service();
@@ -138,10 +144,7 @@ impl WiimoteManager {
     ///
     /// Returns an error if `HidApi` failes to initialize or detect devices.
     fn scan(&mut self) -> WiimoteResult<ScanResult> {
-        unsafe {
-            // Make Wii remotes discoverable to HID API
-            enable_wiimotes_hid_service();
-        }
+        prepare_wiimote_connections();
 
         let hid_api = if let Some(hid_api) = &mut self.hid_api {
             hid_api.refresh_devices()?;

@@ -27,10 +27,10 @@ pub struct MotionPlusCalibration {
 
 impl MotionPlusCalibration {
     #[must_use]
-    pub fn get_angular_velocity(&self, data: &MotionPlusData) -> (f32, f32, f32) {
+    pub fn get_angular_velocity(&self, data: &MotionPlusData) -> (f64, f64, f64) {
         // https://www.wiibrew.org/wiki/Wiimote/Extension_Controllers/Wii_Motion_Plus#Data_Format
-        const UNIT_PER_DEG_PER_S: f32 = 8192.0 / 595.0;
-        const HIGH_SPEED_MULTIPLIER: f32 = 2000.0 / 440.0;
+        const UNIT_PER_DEG_PER_S: f64 = 8192.0 / 595.0;
+        const HIGH_SPEED_MULTIPLIER: f64 = 2000.0 / 440.0;
 
         #[rustfmt::skip]
         let calibration = (
@@ -59,14 +59,14 @@ impl MotionPlusCalibration {
             calibration.2.pitch_zero_value,
         );
         let degrees = (
-            calibration.0.degrees_div_6 as f32 * 6_f32,
-            calibration.1.degrees_div_6 as f32 * 6_f32,
-            calibration.2.degrees_div_6 as f32 * 6_f32,
+            calibration.0.degrees_div_6 as f64 * 6_f64,
+            calibration.1.degrees_div_6 as f64 * 6_f64,
+            calibration.2.degrees_div_6 as f64 * 6_f64,
         );
 
-        let yaw: f32 = normalize(data.yaw, 14, zero.0, scale.0, 16);
-        let roll: f32 = normalize(data.roll, 14, zero.1, scale.1, 16);
-        let pitch: f32 = normalize(data.pitch, 14, zero.2, scale.2, 16);
+        let yaw: f64 = normalize(data.yaw, 14, zero.0, scale.0, 16);
+        let roll: f64 = normalize(data.roll, 14, zero.1, scale.1, 16);
+        let pitch: f64 = normalize(data.pitch, 14, zero.2, scale.2, 16);
 
         (
             yaw * degrees.0 * mode_multiplier.0 / UNIT_PER_DEG_PER_S,

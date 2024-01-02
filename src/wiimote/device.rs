@@ -23,7 +23,7 @@ pub struct AccelerometerCalibration {
 
 impl AccelerometerCalibration {
     #[must_use]
-    pub fn get_acceleration(&self, data: &AccelerometerData) -> (f32, f32, f32) {
+    pub fn get_acceleration(&self, data: &AccelerometerData) -> (f64, f64, f64) {
         let x = normalize(data.x, 10, self.x_zero_offset, self.x_gravity, 10);
         let y = normalize(data.y, 10, self.y_zero_offset, self.y_gravity, 10);
         let z = normalize(data.z, 10, self.z_zero_offset, self.z_gravity, 10);
@@ -148,15 +148,11 @@ impl WiimoteDevice {
         self.hid_device.is_some()
     }
 
-    pub(crate) fn disconnected(&mut self) {
+    pub fn disconnected(&mut self) {
         self.hid_device = None;
     }
 
-    pub(crate) fn reconnect(
-        &mut self,
-        device_info: &DeviceInfo,
-        hid_api: &HidApi,
-    ) -> WiimoteResult<()> {
+    pub fn reconnect(&mut self, device_info: &DeviceInfo, hid_api: &HidApi) -> WiimoteResult<()> {
         let device_type = Self::get_wiimote_device_type(device_info)?;
         let hid_device = device_info.open_device(hid_api)?;
         self.device_type = device_type;

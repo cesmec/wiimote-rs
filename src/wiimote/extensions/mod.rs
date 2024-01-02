@@ -3,7 +3,7 @@ mod motion_plus;
 use crate::prelude::*;
 use crate::wiimote::simple_io;
 
-pub use motion_plus::{MotionPlus, MotionPlusCalibration, MotionPlusData, MotionPlusMode};
+pub use motion_plus::*;
 
 #[derive(Debug)]
 pub enum WiimoteExtension {

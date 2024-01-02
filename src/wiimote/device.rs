@@ -152,6 +152,11 @@ impl WiimoteDevice {
         self.hid_device = None;
     }
 
+    /// Reconnects the Wii remote from the new `DeviceInfo`.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the device is not a recognized Wii remote or the Wii remote failed to initialize.
     pub fn reconnect(&mut self, device_info: &DeviceInfo, hid_api: &HidApi) -> WiimoteResult<()> {
         let device_type = Self::get_wiimote_device_type(device_info)?;
         let hid_device = device_info.open_device(hid_api)?;

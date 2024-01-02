@@ -6,7 +6,7 @@ mod manager;
 mod output;
 mod simple_io;
 
-pub use device::WiimoteDevice;
+pub use device::{AccelerometerCalibration, AccelerometerData, WiimoteDevice};
 pub use extensions::*;
 pub use input::InputReport;
 pub use manager::WiimoteManager;

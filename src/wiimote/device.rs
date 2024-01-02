@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use crate::wiimote::simple_io;
 
+use super::calibration::normalize;
+
 #[derive(Debug, Clone, Copy)]
 pub enum WiimoteDeviceType {
     /// Old Wii remote with potentially an external motion plus
@@ -9,8 +11,8 @@ pub enum WiimoteDeviceType {
     WiimotePlus = 1,
 }
 
-#[derive(Debug, Default)]
-struct AccelererometerCalibrationData {
+#[derive(Debug, Default, Clone)]
+pub struct AccelerometerCalibration {
     x_zero_offset: u16,
     y_zero_offset: u16,
     z_zero_offset: u16,
@@ -19,11 +21,53 @@ struct AccelererometerCalibrationData {
     z_gravity: u16,
 }
 
+impl AccelerometerCalibration {
+    #[must_use]
+    pub fn get_acceleration(&self, data: &AccelerometerData) -> (f32, f32, f32) {
+        let x = normalize(data.x, 10, self.x_zero_offset, self.x_gravity, 10);
+        let y = normalize(data.y, 10, self.y_zero_offset, self.y_gravity, 10);
+        let z = normalize(data.z, 10, self.z_zero_offset, self.z_gravity, 10);
+        (x, y, z)
+    }
+}
+
+pub struct AccelerometerData {
+    x: u16,
+    y: u16,
+    z: u16,
+}
+
+impl AccelerometerData {
+    /// The first two bytes are button data, the next three bytes are acceleration data.
+    #[must_use]
+    pub const fn from_normal_reporting(data: &[u8]) -> Self {
+        Self {
+            x: ((data[2] as u16) << 2) | (((data[0] as u16) >> 5) & 0b11),
+            y: ((data[3] as u16) << 2) | (((data[1] as u16) >> 5) & 0b10),
+            z: ((data[4] as u16) << 2) | (((data[1] as u16) >> 6) & 0b10),
+        }
+    }
+
+    /// The first two bytes are button data, the next byte is acceleration data.
+    #[must_use]
+    #[allow(clippy::similar_names)]
+    pub const fn from_interleaved_reporting(data_3e: &[u8], data_3f: &[u8]) -> Self {
+        Self {
+            x: (data_3e[2] as u16) << 2,
+            y: (data_3f[2] as u16) << 2,
+            z: (((data_3e[1] as u16) << 1) & 0b1100_0000)
+                | (((data_3e[0] as u16) >> 1) & 0b0011_0000)
+                | (((data_3f[1] as u16) >> 3) & 0b0000_1100)
+                | (((data_3f[0] as u16) >> 5) & 0b0000_0011),
+        }
+    }
+}
+
 pub struct WiimoteDevice {
     hid_device: Option<HidDevice>,
     serial_number: String,
     device_type: WiimoteDeviceType,
-    calibration_data: AccelererometerCalibrationData,
+    calibration_data: AccelerometerCalibration,
     motion_plus: Option<MotionPlus>,
     extension: Option<WiimoteExtension>,
 }
@@ -48,7 +92,7 @@ impl WiimoteDevice {
             hid_device: Some(hid_device),
             serial_number: serial.to_string(),
             device_type,
-            calibration_data: AccelererometerCalibrationData::default(),
+            calibration_data: AccelerometerCalibration::default(),
             motion_plus: None,
             extension: None,
         };
@@ -82,6 +126,11 @@ impl WiimoteDevice {
     #[must_use]
     pub const fn device_type(&self) -> WiimoteDeviceType {
         self.device_type
+    }
+
+    #[must_use]
+    pub const fn accelerometer_calibration(&self) -> &AccelerometerCalibration {
+        &self.calibration_data
     }
 
     #[must_use]
@@ -165,7 +214,7 @@ impl WiimoteDevice {
         Ok(())
     }
 
-    fn read_calibration_data(&self) -> WiimoteResult<AccelererometerCalibrationData> {
+    fn read_calibration_data(&self) -> WiimoteResult<AccelerometerCalibration> {
         // https://www.wiibrew.org/wiki/Wiimote#EEPROM_Memory
         // The four bytes starting at 0x0016 and 0x0020 store the calibrated zero offsets for the accelerometer
         // (high 8 bits of X,Y,Z in the first three bytes, low 2 bits packed in the fourth byte as --XXYYZZ).
@@ -180,7 +229,7 @@ impl WiimoteDevice {
             return Err(WiimoteDeviceError::InvalidChecksum.into());
         }
 
-        Ok(AccelererometerCalibrationData {
+        Ok(AccelerometerCalibration {
             x_zero_offset: ((data[0] as u16) << 2) | ((data[3] as u16) >> 4 & 0b11),
             y_zero_offset: ((data[1] as u16) << 2) | ((data[3] as u16) >> 2 & 0b11),
             z_zero_offset: ((data[2] as u16) << 2) | ((data[3] as u16) & 0b11),

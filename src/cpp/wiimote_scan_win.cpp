@@ -1,13 +1,31 @@
 #ifdef _WIN32
 
+#include "scope_guard.h"
 #include "wiimote_api.h"
+#include "wiimote_win.h"
 
 #include <windows.h>
 
 #include <BluetoothAPIs.h>
+#include <cfgmgr32.h>
+#include <hidsdi.h>
+#include <tchar.h>
 
 #include <iostream>
+#include <optional>
+#include <queue>
 #include <string>
+#include <vector>
+
+struct DeviceInfo {
+    uint16_t vendor_id;
+    uint16_t product_id;
+};
+
+typedef std::basic_string<TCHAR> TString;
+
+std::queue<Wiimote*> wiimotes;
+std::vector<BLUETOOTH_DEVICE_INFO> connected_wiimotes;
 
 std::string from_wstring(const std::wstring& wstr) {
     if (wstr.empty()) {
@@ -25,10 +43,6 @@ std::string from_wstring(const std::wstring& wstr) {
     return result;
 }
 
-bool is_wiimote_device_name(const std::string& name) {
-    return name == "Nintendo RVL-CNT-01" || name == "Nintendo RVL-CNT-01-TR";
-}
-
 void register_as_hid_device(HANDLE radio, BLUETOOTH_DEVICE_INFO& device_info) {
     if (!device_info.fConnected && device_info.fRemembered) {
         BluetoothRemoveDevice(&device_info.Address);
@@ -40,7 +54,9 @@ void register_as_hid_device(HANDLE radio, BLUETOOTH_DEVICE_INFO& device_info) {
     DWORD result = BluetoothSetServiceState(radio, &device_info,
         &HumanInterfaceDeviceServiceClass_UUID, BLUETOOTH_SERVICE_ENABLE);
 
-    if (FAILED(result)) {
+    if (SUCCEEDED(result)) {
+        connected_wiimotes.push_back(device_info);
+    } else {
         std::cerr << "Failed to register wiimote as interface device" << std::endl;
     }
 }
@@ -86,6 +102,59 @@ void enumerate_bluetooth_devices(BLUETOOTH_DEVICE_SEARCH_PARAMS search, T callba
     });
 }
 
+HANDLE open_wiimote_device(const TString& device_path, DWORD access) {
+    constexpr auto SHARE_READ_WRITE = FILE_SHARE_READ | FILE_SHARE_WRITE;
+    return CreateFile(device_path.c_str(), access, SHARE_READ_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+}
+
+std::optional<DeviceInfo> get_device_info(const TString& device_path) {
+    HANDLE device_handle = open_wiimote_device(device_path, 0);
+    if (device_handle == INVALID_HANDLE_VALUE) {
+        return {};
+    }
+    auto guard = sg::make_scope_guard([&]() { CloseHandle(device_handle); });
+
+    HIDD_ATTRIBUTES attrib = {};
+    attrib.Size = sizeof(HIDD_ATTRIBUTES);
+    if (HidD_GetAttributes(device_handle, &attrib)) {
+        return std::optional<DeviceInfo>({ attrib.VendorID, attrib.ProductID });
+    }
+    return {};
+}
+
+template <typename T>
+void enumerate_hid_devices(T callback) {
+    GUID hid_id;
+    HidD_GetHidGuid(&hid_id);
+
+    DWORD length;
+    CONFIGRET config_ret = CM_Get_Device_Interface_List_Size(&length, &hid_id, NULL,
+        CM_GET_DEVICE_INTERFACE_LIST_PRESENT);
+    if (config_ret != CR_SUCCESS) {
+        std::cerr << "Failed to get HID device list size" << std::endl;
+        return;
+    }
+
+    TCHAR* device_list = new TCHAR[length];
+    auto guard = sg::make_scope_guard([&]() { delete[] device_list; });
+
+    config_ret = CM_Get_Device_Interface_List(&hid_id, NULL, device_list, length,
+        CM_GET_DEVICE_INTERFACE_LIST_PRESENT);
+    if (config_ret != CR_SUCCESS) {
+        std::cerr << "Failed to get HID device list" << std::endl;
+        return;
+    }
+
+    for (TCHAR* device_path = device_list; device_path[0];
+         device_path += _tcslen(device_path) + 1) {
+        TString device_path_str = device_path;
+
+        if (std::optional<DeviceInfo> device_info = get_device_info(device_path_str)) {
+            callback(*device_info, device_path_str);
+        }
+    }
+}
+
 void enable_wiimotes_hid_service() {
     BLUETOOTH_DEVICE_SEARCH_PARAMS search;
     search.dwSize = sizeof(search);
@@ -104,6 +173,49 @@ void enable_wiimotes_hid_service() {
                 register_as_hid_device(radio, device_info);
             }
         });
+}
+
+uint32_t wiimotes_scan() {
+    enable_wiimotes_hid_service();
+
+    enumerate_hid_devices([&](DeviceInfo device_info, const TString& device_path) {
+        if (is_wiimote(device_info.vendor_id, device_info.product_id)) {
+            HANDLE wiimote_handle = open_wiimote_device(device_path, GENERIC_READ | GENERIC_WRITE);
+            if (wiimote_handle == INVALID_HANDLE_VALUE) {
+                std::cerr << "Failed to connect to wiimote" << std::endl;
+                return;
+            }
+
+            wiimotes.push(new Wiimote(wiimote_handle));
+        }
+    });
+
+    return wiimotes.size();
+}
+
+Wiimote* wiimotes_get_next() {
+    if (wiimotes.empty()) {
+        return nullptr;
+    }
+
+    Wiimote* wiimote = wiimotes.front();
+    wiimotes.pop();
+    return wiimote;
+}
+
+void wiimotes_scan_cleanup() {
+    while (auto* wiimote = wiimotes_get_next()) {
+        wiimote_cleanup(wiimote);
+    }
+
+    enumerate_bluetooth_radios([](HANDLE radio, const BLUETOOTH_RADIO_INFO& radio_info) {
+        for (auto& connected_wiimote : connected_wiimotes) {
+            BluetoothSetServiceState(radio, &connected_wiimote,
+                &HumanInterfaceDeviceServiceClass_UUID, BLUETOOTH_SERVICE_DISABLE);
+        }
+    });
+
+    connected_wiimotes.clear();
 }
 
 #endif

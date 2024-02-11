@@ -1,14 +1,16 @@
 fn main() {
-    println!("cargo:rerun-if-changed=src/hid.h");
-    println!("cargo:rerun-if-changed=src/hid_win.cpp");
+    println!("cargo:rerun-if-changed=src/cpp");
 
     let mut cfg = cc::Build::new();
     cfg.cpp(true);
+    cfg.std("c++17");
+
     if cfg!(windows) {
-        cfg.file("src/hid_win.cpp");
-        cfg.cpp_link_stdlib("hid");
-        cfg.cpp_link_stdlib("BluetoothApis");
+        cfg.define("WIN32_LEAN_AND_MEAN", None);
+        cfg.file("src/cpp/wiimote_scan_win.cpp");
+        println!("cargo:rustc-link-lib=hid");
+        println!("cargo:rustc-link-lib=BluetoothApis");
     }
 
-    cfg.compile("wiimote_hid");
+    cfg.compile("wiimote_api");
 }

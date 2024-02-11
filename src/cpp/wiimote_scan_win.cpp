@@ -1,65 +1,52 @@
-#include "hid.h"
-
 #ifdef _WIN32
 
-#define WIN32_LEAN_AND_MEAN
+#include "wiimote_api.h"
+
 #include <windows.h>
+
 #include <BluetoothAPIs.h>
 
-#include <codecvt>
 #include <iostream>
-#include <locale>
 #include <string>
 
-std::wstring to_wstring(const std::string& str) {
-    using convert_type = std::codecvt_utf8<wchar_t>;
-    std::wstring_convert<convert_type, wchar_t> converter;
-
-    return converter.from_bytes(str);
-}
-
 std::string from_wstring(const std::wstring& wstr) {
-    using convert_type = std::codecvt_utf8<wchar_t>;
-    std::wstring_convert<convert_type, wchar_t> converter;
+    if (wstr.empty()) {
+        return "";
+    }
+    int result_size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), nullptr, 0,
+        nullptr, nullptr);
+    if (result_size <= 0) {
+        return "";
+    }
 
-    return converter.to_bytes(wstr);
+    std::string result(result_size, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), result.data(), result_size,
+        nullptr, nullptr);
+    return result;
 }
 
 bool is_wiimote_device_name(const std::string& name) {
     return name == "Nintendo RVL-CNT-01" || name == "Nintendo RVL-CNT-01-TR";
 }
 
-bool attach_wiimote(HANDLE radio, BLUETOOTH_DEVICE_INFO& device_info) {
-    if (device_info.fConnected || device_info.fRemembered) {
-        return false;
-    }
-
-    // Enable HID service
-    DWORD result = BluetoothSetServiceState(
-        radio,
-        &device_info,
-        &HumanInterfaceDeviceServiceClass_UUID,
-        BLUETOOTH_SERVICE_ENABLE);
-
-    if (FAILED(result)) {
-        std::cout << "Failed to enable HID service on wiimote" << std::endl;
-        return false;
-    }
-
-    return true;
-}
-
-bool forget_wiimote(BLUETOOTH_DEVICE_INFO& device_info) {
+void register_as_hid_device(HANDLE radio, BLUETOOTH_DEVICE_INFO& device_info) {
     if (!device_info.fConnected && device_info.fRemembered) {
         BluetoothRemoveDevice(&device_info.Address);
-        return true;
+    }
+    if (device_info.fConnected || device_info.fRemembered) {
+        return;
     }
 
-    return false;
+    DWORD result = BluetoothSetServiceState(radio, &device_info,
+        &HumanInterfaceDeviceServiceClass_UUID, BLUETOOTH_SERVICE_ENABLE);
+
+    if (FAILED(result)) {
+        std::cerr << "Failed to register wiimote as interface device" << std::endl;
+    }
 }
 
-template<typename T>
-void enumerate_radios(T callback) {
+template <typename T>
+void enumerate_bluetooth_radios(T callback) {
     BLUETOOTH_FIND_RADIO_PARAMS radio_param;
     radio_param.dwSize = sizeof(radio_param);
 
@@ -76,12 +63,14 @@ void enumerate_radios(T callback) {
         } while (BluetoothFindNextRadio(radio_find, &radio));
 
         BluetoothFindRadioClose(radio_find);
+    } else {
+        std::cerr << "No bluetooth adapter found" << std::endl;
     }
 }
 
-template<typename T>
+template <typename T>
 void enumerate_bluetooth_devices(BLUETOOTH_DEVICE_SEARCH_PARAMS search, T callback) {
-    enumerate_radios([&](HANDLE radio, const BLUETOOTH_RADIO_INFO& radio_info) {
+    enumerate_bluetooth_radios([&](HANDLE radio, const BLUETOOTH_RADIO_INFO& radio_info) {
         search.hRadio = radio;
 
         BLUETOOTH_DEVICE_INFO device_info = {};
@@ -107,13 +96,14 @@ void enable_wiimotes_hid_service() {
     search.fIssueInquiry = true;
     search.cTimeoutMultiplier = 2;
 
-    enumerate_bluetooth_devices(search, [&](HANDLE radio, const BLUETOOTH_RADIO_INFO& radio_info, BLUETOOTH_DEVICE_INFO& device_info) {
-        std::string name = from_wstring(device_info.szName);
-        if (is_wiimote_device_name(name)) {
-            forget_wiimote(device_info);
-            attach_wiimote(radio, device_info);
-        }
-    });
+    enumerate_bluetooth_devices(search,
+        [&](HANDLE radio, const BLUETOOTH_RADIO_INFO& radio_info,
+            BLUETOOTH_DEVICE_INFO& device_info) {
+            std::string name = from_wstring(device_info.szName);
+            if (is_wiimote_device_name(name)) {
+                register_as_hid_device(radio, device_info);
+            }
+        });
 }
 
 #endif

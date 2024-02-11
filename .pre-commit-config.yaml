@@ -7,3 +7,13 @@ repos:
         files: \.rs$
         stages: [ commit ]
         language: system
+
+      - id: clang-format
+        name: Run clang-format for C++ and C files
+        entry: clang-format -i
+        language: python
+        'types_or': [c++, c]
+        args: ["-style=file"]
+        require_serial: false
+        additional_dependencies: []
+        minimum_pre_commit_version: '2.9.2'

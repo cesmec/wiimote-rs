@@ -1,0 +1,8 @@
+---
+BasedOnStyle: WebKit
+AllowAllArgumentsOnNextLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Attach
+ColumnLimit: 100
+IndentExternBlock: Indent

@@ -12,6 +12,10 @@ fn main() {
         cfg.file("src/cpp/wiimote_scan_win.cpp");
         println!("cargo:rustc-link-lib=hid");
         println!("cargo:rustc-link-lib=BluetoothApis");
+    } else {
+        cfg.file("src/cpp/wiimote_linux.cpp");
+        cfg.file("src/cpp/wiimote_scan_linux.cpp");
+        println!("cargo:rustc-link-lib=bluetooth");
     }
 
     cfg.compile("wiimote_api");

@@ -5,6 +5,8 @@
 
 #if _WIN32
 #include "wiimote_win.h"
+#else
+#include "wiimote_linux.h"
 #endif
 
 extern "C" {

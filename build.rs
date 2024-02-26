@@ -8,6 +8,7 @@ fn main() {
 
     if cfg!(windows) {
         cfg.define("WIN32_LEAN_AND_MEAN", None);
+        cfg.define("NOMINMAX", None);
         cfg.file("src/cpp/wiimote_win.cpp");
         cfg.file("src/cpp/wiimote_scan_win.cpp");
         println!("cargo:rustc-link-lib=hid");

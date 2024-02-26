@@ -2,9 +2,9 @@
 
 #include "wiimote_shared.h"
 
-class WiimoteLinux final : WiimoteBase {
+class WiimoteLinux final : public WiimoteBase {
 public:
-    WiimoteLinux(int control_socket, int data_socket);
+    WiimoteLinux(const std::string& identifier, int control_socket, int data_socket);
     ~WiimoteLinux();
 
     int32_t read(uint8_t* buffer, size_t buffer_size) final override;

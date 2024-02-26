@@ -40,6 +40,16 @@ extern "C" {
      */
     int32_t wiimote_write(Wiimote* wiimote, const uint8_t* buffer, size_t data_size);
     /**
+     * Get the length of the wiimote unique identifier including null terminator.
+     */
+    size_t wiimote_get_identifier_length(Wiimote* wiimote);
+    /**
+     * Get the unique identifier of the wiimote.
+     * Returns false if the buffer is too small.
+     */
+    bool wiimote_get_identifier(Wiimote* wiimote, char* identifier,
+        size_t identifier_buffer_length);
+    /**
      * Cleanup resources when the wiimote connection is no longer needed.
      */
     void wiimote_cleanup(Wiimote* wiimote);

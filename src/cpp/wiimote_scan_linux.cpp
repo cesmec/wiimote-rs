@@ -53,7 +53,10 @@ void handle_wiimote(bdaddr_t bdaddr) {
         return;
     }
 
-    wiimotes.push(new Wiimote(*control_socket, *data_socket));
+    char address_string[19] = { 0 };
+    ba2str(&bdaddr, address_string);
+
+    wiimotes.push(new Wiimote(address_string, *control_socket, *data_socket));
 }
 
 void enable_wiimotes_hid_service() { }

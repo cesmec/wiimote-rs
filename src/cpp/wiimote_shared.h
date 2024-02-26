@@ -5,9 +5,18 @@
 #include <string>
 
 class WiimoteBase {
+protected:
+    explicit WiimoteBase(const std::string& identifier)
+        : m_identifier(identifier) { }
+
 public:
     virtual int32_t read(uint8_t* buffer, size_t buffer_size) = 0;
     virtual int32_t write(const uint8_t* buffer, size_t data_size) = 0;
+
+    const std::string& get_identifier() const { return m_identifier; }
+
+private:
+    std::string m_identifier;
 };
 
 constexpr uint16_t WIIMOTE_VENDOR_ID = 0x057E;

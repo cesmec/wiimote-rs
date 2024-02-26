@@ -2,8 +2,9 @@
 
 #include "wiimote_win.h"
 
-WiimoteWindows::WiimoteWindows(HANDLE handle)
-    : m_handle(handle) { }
+WiimoteWindows::WiimoteWindows(const std::string& identifier, HANDLE handle)
+    : WiimoteBase(identifier)
+    , m_handle(handle) { }
 
 WiimoteWindows::~WiimoteWindows() {
     CloseHandle(m_handle);

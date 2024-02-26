@@ -9,8 +9,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-WiimoteLinux::WiimoteLinux(int control_socket, int data_socket)
-    : m_control_socket(control_socket)
+WiimoteLinux::WiimoteLinux(const std::string& identifier, int control_socket, int data_socket)
+    : WiimoteBase(identifier)
+    , m_control_socket(control_socket)
     , m_data_socket(data_socket) { }
 
 WiimoteLinux::~WiimoteLinux() {

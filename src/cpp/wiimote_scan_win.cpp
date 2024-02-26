@@ -20,6 +20,7 @@
 struct DeviceInfo {
     uint16_t vendor_id;
     uint16_t product_id;
+    std::string serial_number;
 };
 
 typedef std::basic_string<TCHAR> TString;
@@ -116,8 +117,11 @@ std::optional<DeviceInfo> get_device_info(const TString& device_path) {
 
     HIDD_ATTRIBUTES attrib = {};
     attrib.Size = sizeof(HIDD_ATTRIBUTES);
-    if (HidD_GetAttributes(device_handle, &attrib)) {
-        return std::optional<DeviceInfo>({ attrib.VendorID, attrib.ProductID });
+    WCHAR name_buffer[64];
+    if (HidD_GetAttributes(device_handle, &attrib)
+        && HidD_GetSerialNumberString(device_handle, name_buffer, sizeof(name_buffer))) {
+        return std::optional<DeviceInfo>(
+            { attrib.VendorID, attrib.ProductID, from_wstring(name_buffer) });
     }
     return {};
 }
@@ -186,7 +190,7 @@ uint32_t wiimotes_scan() {
                 return;
             }
 
-            wiimotes.push(new Wiimote(wiimote_handle));
+            wiimotes.push(new Wiimote(device_info.serial_number, wiimote_handle));
         }
     });
 

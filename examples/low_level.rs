@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::ffi::{c_void, CString};
 
 use wiimote_rs::prelude::InputReport;
 
@@ -22,6 +22,17 @@ unsafe fn handle_wiimote(wiimote: *mut c_void) {
     // https://www.wiibrew.org/wiki/Wiimote#Player_LEDs
     const LED1: u8 = 0x10;
     const LED4: u8 = 0x80;
+
+    let identifier = unsafe {
+        let length = wiimote_get_identifier_length(wiimote);
+        let mut identifier = vec![0u8; length];
+        if wiimote_get_identifier(wiimote, identifier.as_mut_ptr(), identifier.len()) {
+            CString::from_vec_with_nul(identifier).map_or(String::default(), |s| s.to_string_lossy().to_string())
+        } else {
+            String::default()
+        }
+    };
+    println!("Wiimote identifier: {identifier}");
 
     println!("Found a wiimote! changing leds...");
     let data: [u8; 2] = [0x11, LED1 | LED4];
@@ -71,5 +82,7 @@ extern "C" {
 
     fn wiimote_read(wiimote: *mut c_void, buffer: *mut u8, buffer_size: usize) -> i32;
     fn wiimote_write(wiimote: *mut c_void, buffer: *const u8, data_size: usize) -> i32;
+    fn wiimote_get_identifier_length(wiimote: *mut c_void) -> usize;
+    fn wiimote_get_identifier(wiimote: *mut c_void, identifier: *mut u8, identifier_buffer_length: usize) -> bool;
     fn wiimote_cleanup(wiimote: *mut c_void);
 }

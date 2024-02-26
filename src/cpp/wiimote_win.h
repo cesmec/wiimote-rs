@@ -4,9 +4,9 @@
 
 #include <windows.h>
 
-class WiimoteWindows final : WiimoteBase {
+class WiimoteWindows final : public WiimoteBase {
 public:
-    explicit WiimoteWindows(HANDLE handle);
+    WiimoteWindows(const std::string& identifier, HANDLE handle);
     ~WiimoteWindows();
 
     int32_t read(uint8_t* buffer, size_t buffer_size) final override;

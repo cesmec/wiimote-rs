@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <cstring>
+#include <poll.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -43,6 +44,19 @@ int32_t WiimoteLinux::read(uint8_t* buffer, size_t buffer_size) {
     memcpy(buffer, &read_buffer[1], bytes_read - 1);
 
     return static_cast<int32_t>(bytes_read - 1);
+}
+
+int32_t WiimoteLinux::read_timeout(uint8_t* buffer, size_t buffer_size, size_t timeout_millis) {
+    pollfd read_poll;
+    read_poll.fd = m_data_socket;
+    read_poll.events = POLLIN;
+
+    int result = poll(&read_poll, 1, timeout_millis);
+    if (result <= 0) {
+        return result;
+    }
+
+    return this->read(buffer, buffer_size);
 }
 
 int32_t WiimoteLinux::write(const uint8_t* buffer, size_t data_size) {

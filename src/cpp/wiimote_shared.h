@@ -11,6 +11,7 @@ protected:
 
 public:
     virtual int32_t read(uint8_t* buffer, size_t buffer_size) = 0;
+    virtual int32_t read_timeout(uint8_t* buffer, size_t buffer_size, size_t timeout_millis) = 0;
     virtual int32_t write(const uint8_t* buffer, size_t data_size) = 0;
 
     const std::string& get_identifier() const { return m_identifier; }

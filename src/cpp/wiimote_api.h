@@ -35,6 +35,12 @@ extern "C" {
      */
     int32_t wiimote_read(Wiimote* wiimote, uint8_t* buffer, size_t buffer_size);
     /**
+     * Read n bytes from the wiimote.
+     * Returns the number of bytes read, 0 on EOF and timeout or -1 on error.
+     */
+    int32_t wiimote_read_timeout(Wiimote* wiimote, uint8_t* buffer, size_t buffer_size,
+        size_t timeout_millis);
+    /**
      * Write n bytes to the wiimote.
      * Returns the number of bytes written or -1 on error.
      */

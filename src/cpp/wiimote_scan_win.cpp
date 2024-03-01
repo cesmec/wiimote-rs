@@ -17,19 +17,23 @@
 #include <iostream>
 #include <optional>
 #include <queue>
+#include <set>
+#include <sstream>
 #include <string>
-#include <vector>
+#include <unordered_map>
 
 struct DeviceInfo {
     uint16_t vendor_id;
     uint16_t product_id;
     std::string serial_number;
+    HIDP_CAPS capabilities;
 };
 
 typedef std::basic_string<TCHAR> TString;
 
+std::set<std::string> wiimotes_handled;
 std::queue<Wiimote*> wiimotes;
-std::vector<BLUETOOTH_DEVICE_INFO> connected_wiimotes;
+std::unordered_map<std::string, BLUETOOTH_DEVICE_INFO> connected_wiimotes;
 
 std::string from_wstring(const std::wstring& wstr) {
     if (wstr.empty()) {
@@ -48,6 +52,13 @@ std::string from_wstring(const std::wstring& wstr) {
 }
 
 void register_as_hid_device(HANDLE radio, BLUETOOTH_DEVICE_INFO& device_info) {
+    std::stringstream device_id_stream;
+    device_id_stream << std::hex << device_info.Address.ullLong;
+    std::string device_id = device_id_stream.str();
+    if (connected_wiimotes.contains(device_id)) {
+        return;
+    }
+
     if (!device_info.fConnected && device_info.fRemembered) {
         BluetoothRemoveDevice(&device_info.Address);
     }
@@ -59,7 +70,7 @@ void register_as_hid_device(HANDLE radio, BLUETOOTH_DEVICE_INFO& device_info) {
         &HumanInterfaceDeviceServiceClass_UUID, BLUETOOTH_SERVICE_ENABLE);
 
     if (SUCCEEDED(result)) {
-        connected_wiimotes.push_back(device_info);
+        connected_wiimotes[device_id] = device_info;
     } else {
         std::cerr << "Failed to register wiimote as interface device" << std::endl;
     }
@@ -67,10 +78,10 @@ void register_as_hid_device(HANDLE radio, BLUETOOTH_DEVICE_INFO& device_info) {
 
 template <typename T>
 void enumerate_bluetooth_radios(T callback) {
-    BLUETOOTH_FIND_RADIO_PARAMS radio_param;
+    BLUETOOTH_FIND_RADIO_PARAMS radio_param = {};
     radio_param.dwSize = sizeof(radio_param);
 
-    HANDLE radio;
+    HANDLE radio = nullptr;
     if (HBLUETOOTH_RADIO_FIND radio_find = BluetoothFindFirstRadio(&radio_param, &radio)) {
         do {
             BLUETOOTH_RADIO_INFO radio_info = {};
@@ -108,7 +119,8 @@ void enumerate_bluetooth_devices(BLUETOOTH_DEVICE_SEARCH_PARAMS search, T callba
 
 HANDLE open_wiimote_device(const TString& device_path, DWORD access) {
     constexpr auto SHARE_READ_WRITE = FILE_SHARE_READ | FILE_SHARE_WRITE;
-    return CreateFile(device_path.c_str(), access, SHARE_READ_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    return CreateFile(device_path.c_str(), access, SHARE_READ_WRITE, NULL, OPEN_EXISTING,
+        FILE_FLAG_OVERLAPPED, NULL);
 }
 
 std::optional<DeviceInfo> get_device_info(const TString& device_path) {
@@ -121,10 +133,14 @@ std::optional<DeviceInfo> get_device_info(const TString& device_path) {
     HIDD_ATTRIBUTES attrib = {};
     attrib.Size = sizeof(HIDD_ATTRIBUTES);
     WCHAR name_buffer[64];
+    PHIDP_PREPARSED_DATA preparsed_data = nullptr;
+    HIDP_CAPS capabilities = {};
     if (HidD_GetAttributes(device_handle, &attrib)
-        && HidD_GetSerialNumberString(device_handle, name_buffer, sizeof(name_buffer))) {
+        && HidD_GetSerialNumberString(device_handle, name_buffer, sizeof(name_buffer))
+        && HidD_GetPreparsedData(device_handle, &preparsed_data)
+        && HidP_GetCaps(preparsed_data, &capabilities) == HIDP_STATUS_SUCCESS) {
         return std::optional<DeviceInfo>(
-            { attrib.VendorID, attrib.ProductID, from_wstring(name_buffer) });
+            { attrib.VendorID, attrib.ProductID, from_wstring(name_buffer), capabilities });
     }
     return {};
 }
@@ -163,7 +179,7 @@ void enumerate_hid_devices(T callback) {
 }
 
 void enable_wiimotes_hid_service() {
-    BLUETOOTH_DEVICE_SEARCH_PARAMS search;
+    BLUETOOTH_DEVICE_SEARCH_PARAMS search = {};
     search.dwSize = sizeof(search);
     search.fReturnAuthenticated = true;
     search.fReturnRemembered = true;
@@ -186,14 +202,17 @@ uint32_t wiimotes_scan() {
     enable_wiimotes_hid_service();
 
     enumerate_hid_devices([&](DeviceInfo device_info, const TString& device_path) {
-        if (is_wiimote(device_info.vendor_id, device_info.product_id)) {
+        if (is_wiimote(device_info.vendor_id, device_info.product_id)
+            && !wiimotes_handled.contains(device_info.serial_number)) {
             HANDLE wiimote_handle = open_wiimote_device(device_path, GENERIC_READ | GENERIC_WRITE);
             if (wiimote_handle == INVALID_HANDLE_VALUE) {
                 std::cerr << "Failed to connect to wiimote" << std::endl;
                 return;
             }
 
-            wiimotes.push(new Wiimote(device_info.serial_number, wiimote_handle));
+            wiimotes_handled.insert(device_info.serial_number);
+            wiimotes.push(
+                new Wiimote(device_info.serial_number, wiimote_handle, device_info.capabilities));
         }
     });
 
@@ -216,13 +235,17 @@ void wiimotes_scan_cleanup() {
     }
 
     enumerate_bluetooth_radios([](HANDLE radio, const BLUETOOTH_RADIO_INFO& radio_info) {
-        for (auto& connected_wiimote : connected_wiimotes) {
+        for (auto& [device_id, connected_wiimote] : connected_wiimotes) {
             BluetoothSetServiceState(radio, &connected_wiimote,
                 &HumanInterfaceDeviceServiceClass_UUID, BLUETOOTH_SERVICE_DISABLE);
         }
     });
 
     connected_wiimotes.clear();
+}
+
+void wiimote_disconnected(const std::string& serial_number) {
+    wiimotes_handled.erase(serial_number);
 }
 
 #endif

@@ -4,11 +4,14 @@
 
 #include <windows.h>
 
+#include <hidsdi.h>
+
 #include <optional>
+#include <vector>
 
 class WiimoteWindows final : public WiimoteBase {
 public:
-    WiimoteWindows(const std::string& identifier, HANDLE handle);
+    WiimoteWindows(const std::string& serial_number, HANDLE handle, HIDP_CAPS capabilities);
     ~WiimoteWindows();
 
     int32_t read(uint8_t* buffer, size_t buffer_size) final override;
@@ -21,9 +24,13 @@ private:
 
 private:
     HANDLE m_handle = 0;
-    OVERLAPPED m_overlapped = {};
+
     bool m_read_pending = false;
-    uint8_t m_overlapped_read_buffer[32];
+    bool m_write_pending = false;
+    OVERLAPPED m_overlapped_read = {};
+    OVERLAPPED m_overlapped_write = {};
+    std::vector<uint8_t> m_read_buffer = {};
+    std::vector<uint8_t> m_write_buffer = {};
 };
 
 using Wiimote = WiimoteWindows;

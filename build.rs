@@ -3,7 +3,7 @@ fn main() {
 
     let mut cfg = cc::Build::new();
     cfg.cpp(true);
-    cfg.std("c++17");
+    cfg.std("c++20");
     cfg.file("src/cpp/wiimote_api.cpp");
 
     if cfg!(windows) {

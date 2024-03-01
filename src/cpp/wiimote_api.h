@@ -10,8 +10,6 @@
 #endif
 
 extern "C" {
-    /** Deprecated */
-    void enable_wiimotes_hid_service();
     constexpr const size_t DEFAULT_BUFFER_SIZE = 32;
     /**
      * Scan for available wiimotes.

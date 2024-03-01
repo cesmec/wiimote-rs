@@ -1,16 +1,7 @@
-use hidapi::HidError;
-
 #[derive(Debug)]
 pub enum WiimoteError {
-    HidApiError(HidError),
     WiimoteDeviceError(WiimoteDeviceError),
     Disconnected,
-}
-
-impl From<HidError> for WiimoteError {
-    fn from(e: HidError) -> Self {
-        Self::HidApiError(e)
-    }
 }
 
 #[derive(Debug)]

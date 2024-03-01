@@ -9,5 +9,5 @@ mod simple_io;
 pub use device::{AccelerometerCalibration, AccelerometerData, WiimoteDevice, WiimoteDeviceType};
 pub use extensions::*;
 pub use input::InputReport;
-pub use manager::{prepare_wiimote_connections, WiimoteManager};
+pub use manager::WiimoteManager;
 pub use output::*;

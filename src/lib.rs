@@ -9,5 +9,4 @@ pub mod prelude {
     pub use crate::result::*;
     pub use crate::wiimote::*;
     pub use crate::WIIMOTE_REPORT_BUFFER_SIZE;
-    pub use hidapi::*;
 }

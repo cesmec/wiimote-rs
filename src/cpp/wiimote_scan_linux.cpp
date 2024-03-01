@@ -59,8 +59,6 @@ void handle_wiimote(bdaddr_t bdaddr) {
     wiimotes.push(new Wiimote(address_string, *control_socket, *data_socket));
 }
 
-void enable_wiimotes_hid_service() { }
-
 uint32_t wiimotes_scan() {
     constexpr int MAX_INQUIRIES = 255;
     inquiry_info infos[MAX_INQUIRIES] {};

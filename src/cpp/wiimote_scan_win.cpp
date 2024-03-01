@@ -6,6 +6,9 @@
 
 #include <windows.h>
 
+// Needs to be included before BluetoothAPIs.h to correctly define its UUIDs
+#include <initguid.h>
+
 #include <BluetoothAPIs.h>
 #include <cfgmgr32.h>
 #include <hidsdi.h>

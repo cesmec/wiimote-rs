@@ -10,22 +10,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_linux:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: sudo apt-get install -y libudev-dev libbluetooth-dev
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+  ci:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
-  build_windows:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
+
+    - if: runner.os == 'Linux'
+      name: Install dependencies
+      run: sudo apt-get install -y libudev-dev libbluetooth-dev
+
     - name: Build
       run: cargo build --verbose
+
+    - name: Build examples
+      run: cargo build --verbose --examples
+
     - name: Run tests
       run: cargo test --verbose

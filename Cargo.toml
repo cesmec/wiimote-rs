@@ -9,6 +9,20 @@ authors = ["cesmec"]
 bitflags = "2.4"
 crc32fast = "1.3"
 crossbeam-channel = "0.5"
+once_cell = "1.19.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.54.0", features = [
+    "Devices_Bluetooth",
+    "Win32_Devices_Bluetooth",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Devices_HumanInterfaceDevice",
+    "Win32_Globalization",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+] }
 
 [build-dependencies]
 cc = "1.0"

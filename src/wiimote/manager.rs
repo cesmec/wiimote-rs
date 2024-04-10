@@ -3,16 +3,11 @@ use std::sync::{Arc, Mutex, Once};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use super::device::{NativeWiimote, WiimoteDevice};
+use super::device::WiimoteDevice;
+use super::native::{wiimotes_scan, wiimotes_scan_cleanup, NativeWiimote};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct WiimoteSerialNumber(pub String);
-
-extern "C" {
-    fn wiimotes_scan() -> u32;
-    fn wiimotes_get_next() -> *mut NativeWiimote;
-    fn wiimotes_scan_cleanup();
-}
 
 type MutexWiimoteDevice = Arc<Mutex<WiimoteDevice>>;
 
@@ -48,14 +43,12 @@ impl WiimoteManager {
     }
 
     fn new() -> Arc<Mutex<Self>> {
-        Self::with_interval(Duration::from_millis(100))
+        Self::with_interval(Duration::from_millis(500))
     }
 
     /// Cleanup the Wii remote manager instance and disconnect all Wii remotes.
     pub fn cleanup() {
-        unsafe {
-            wiimotes_scan_cleanup();
-        }
+        wiimotes_scan_cleanup();
     }
 
     fn with_interval(interval: Duration) -> Arc<Mutex<Self>> {
@@ -132,20 +125,16 @@ impl WiimoteManager {
 
     /// Scan the Wii remotes connected to your computer.
     fn scan(&mut self) -> ScanResult {
-        let wiimote_count = unsafe { wiimotes_scan() };
+        let mut native_devices = Vec::new();
+        wiimotes_scan(&mut native_devices);
 
         let mut new_devices = Vec::new();
         let mut reconnected_devices = Vec::new();
 
         // TODO: iterate disconnected devices and mark them as disconnected
 
-        for _i in 0..wiimote_count {
-            let native_wiimote = unsafe { wiimotes_get_next() };
-            if native_wiimote.is_null() {
-                break;
-            }
-
-            let identifier = WiimoteDevice::get_identifier(native_wiimote);
+        for native_wiimote in native_devices {
+            let identifier = native_wiimote.identifier();
             let serial_number = WiimoteSerialNumber(identifier);
             if let Some(existing_device) = self.devices.get(&serial_number) {
                 let result = existing_device.lock().unwrap().reconnect(native_wiimote);
@@ -154,7 +143,7 @@ impl WiimoteManager {
                     Err(error) => eprintln!("Failed to reconnect wiimote: {error:?}"),
                 }
             } else {
-                match unsafe { WiimoteDevice::new(native_wiimote) } {
+                match WiimoteDevice::new(native_wiimote) {
                     Ok(device) => {
                         let new_device = Arc::new(Mutex::new(device));
                         new_devices.push(Arc::clone(&new_device));

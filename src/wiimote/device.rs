@@ -1,41 +1,10 @@
-use std::ffi::CString;
+use std::sync::Mutex;
 
 use crate::prelude::*;
 use crate::wiimote::simple_io;
 
 use super::calibration::normalize;
-
-#[derive(Debug, Clone, Copy)]
-pub enum WiimoteDeviceType {
-    /// Old Wii remote with potentially an external motion plus
-    Wiimote = 0,
-    /// Wii remote plus with integrated motion plus
-    WiimotePlus = 1,
-}
-
-#[repr(C)]
-pub struct NativeWiimote {
-    _data: [u8; 0],
-    _marker: core::marker::PhantomData<core::marker::PhantomPinned>,
-}
-
-extern "C" {
-    fn wiimote_read(wiimote: *mut NativeWiimote, buffer: *mut u8, buffer_size: usize) -> i32;
-    fn wiimote_read_timeout(
-        wiimote: *mut NativeWiimote,
-        buffer: *mut u8,
-        buffer_size: usize,
-        timeout_millis: usize,
-    ) -> i32;
-    fn wiimote_write(wiimote: *mut NativeWiimote, buffer: *const u8, data_size: usize) -> i32;
-    fn wiimote_get_identifier_length(wiimote: *mut NativeWiimote) -> usize;
-    fn wiimote_get_identifier(
-        wiimote: *mut NativeWiimote,
-        identifier: *mut u8,
-        identifier_buffer_length: usize,
-    ) -> bool;
-    fn wiimote_cleanup(wiimote: *mut NativeWiimote);
-}
+use super::native::{NativeWiimote, NativeWiimoteDevice};
 
 #[derive(Debug, Default, Clone)]
 pub struct AccelerometerCalibration {
@@ -90,9 +59,8 @@ impl AccelerometerData {
 }
 
 pub struct WiimoteDevice {
-    device: *mut NativeWiimote,
+    device: Mutex<Option<NativeWiimoteDevice>>,
     identifier: String,
-    // device_type: WiimoteDeviceType,
     calibration_data: AccelerometerCalibration,
     motion_plus: Option<MotionPlus>,
     extension: Option<WiimoteExtension>,
@@ -102,23 +70,16 @@ unsafe impl Sync for WiimoteDevice {}
 unsafe impl Send for WiimoteDevice {}
 
 impl WiimoteDevice {
-    /// Wraps the `DeviceInfo` as a `WiimoteDevice`.
+    /// Wraps the `NativeWiimoteDevice` as a `WiimoteDevice`.
     ///
     /// # Errors
     ///
     /// This function will return an error if the device is not a recognized Wii remote or initialization failed.
-    pub(crate) unsafe fn new(device: *mut NativeWiimote) -> WiimoteResult<Self> {
-        if device.is_null() {
-            return Err(WiimoteError::Disconnected);
-        }
-
-        let identifier = Self::get_identifier(device);
-        println!("wiimote {identifier}");
-
+    pub(crate) fn new(device: NativeWiimoteDevice) -> WiimoteResult<Self> {
+        let identifier = device.identifier();
         let mut wiimote = Self {
-            device,
+            device: Mutex::new(Some(device)),
             identifier,
-            // device_type,
             calibration_data: AccelerometerCalibration::default(),
             motion_plus: None,
             extension: None,
@@ -128,28 +89,10 @@ impl WiimoteDevice {
         Ok(wiimote)
     }
 
-    pub(crate) fn get_identifier(device: *mut NativeWiimote) -> String {
-        unsafe {
-            let length = wiimote_get_identifier_length(device);
-            let mut identifier = vec![0u8; length];
-            if wiimote_get_identifier(device, identifier.as_mut_ptr(), identifier.len()) {
-                CString::from_vec_with_nul(identifier)
-                    .map_or(String::default(), |s| s.to_string_lossy().to_string())
-            } else {
-                String::default()
-            }
-        }
-    }
-
     #[must_use]
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
-
-    // #[must_use]
-    // pub const fn device_type(&self) -> WiimoteDeviceType {
-    //     self.device_type
-    // }
 
     #[must_use]
     pub const fn accelerometer_calibration(&self) -> &AccelerometerCalibration {
@@ -168,25 +111,24 @@ impl WiimoteDevice {
 
     #[must_use]
     pub fn is_connected(&self) -> bool {
-        !self.device.is_null()
+        self.device
+            .lock()
+            .map(|device| device.is_some())
+            .unwrap_or(false)
     }
 
-    pub fn disconnected(&mut self) {
-        self.device = std::ptr::null_mut();
+    pub fn disconnected(&self) {
+        _ = self.device.lock().map(|mut device| device.take());
     }
 
-    /// Reconnects the Wii remote from a `NativeWiimote`.
+    /// Reconnects the Wii remote from a `NativeWiimoteDevice`.
     ///
     /// # Errors
     ///
     /// This function will return an error if the device is not a recognized Wii remote or the Wii remote failed to initialize.
-    pub fn reconnect(&mut self, device: *mut NativeWiimote) -> WiimoteResult<()> {
-        if !self.device.is_null() {
-            unsafe {
-                wiimote_cleanup(self.device);
-            }
-        }
-        self.device = device;
+    pub fn reconnect(&mut self, device: NativeWiimoteDevice) -> WiimoteResult<()> {
+        self.disconnected();
+        _ = self.device.lock().map(|mut d| d.replace(device));
         self.initialize()
     }
 
@@ -196,17 +138,17 @@ impl WiimoteDevice {
     ///
     /// This function will return an error if the Wii remote is disconnected or write failed.
     pub fn write(&self, data: &[u8]) -> WiimoteResult<usize> {
-        if self.device.is_null() {
-            return Err(WiimoteError::Disconnected);
+        let mut device = match self.device.lock() {
+            Ok(device) => device,
+            Err(err) => err.into_inner(),
+        };
+        if let Some(device) = device.as_mut() {
+            if let Some(bytes_written) = device.write(data) {
+                return Ok(bytes_written);
+            }
         }
-
-        let written = unsafe { wiimote_write(self.device, data.as_ptr(), data.len()) };
-        if written >= 0 {
-            #[allow(clippy::cast_sign_loss)]
-            Ok(written as usize)
-        } else {
-            Err(WiimoteError::Disconnected)
-        }
+        _ = device.take();
+        Err(WiimoteError::Disconnected)
     }
 
     /// Reads data from the connected Wii remote.
@@ -215,17 +157,17 @@ impl WiimoteDevice {
     ///
     /// This function will return an error if the Wii remote is disconnected or read failed.
     pub fn read(&self, buffer: &mut [u8]) -> WiimoteResult<usize> {
-        if self.device.is_null() {
-            return Err(WiimoteError::Disconnected);
+        let mut device = match self.device.lock() {
+            Ok(device) => device,
+            Err(err) => err.into_inner(),
+        };
+        if let Some(device) = device.as_mut() {
+            if let Some(bytes_read) = device.read(buffer) {
+                return Ok(bytes_read);
+            }
         }
-
-        let read = unsafe { wiimote_read(self.device, buffer.as_mut_ptr(), buffer.len()) };
-        if read >= 0 {
-            #[allow(clippy::cast_sign_loss)]
-            Ok(read as usize)
-        } else {
-            Err(WiimoteError::Disconnected)
-        }
+        _ = device.take();
+        Err(WiimoteError::Disconnected)
     }
 
     /// Reads data from the connected Wii remote waiting for a maximum of `timeout_millis`.
@@ -234,24 +176,17 @@ impl WiimoteDevice {
     ///
     /// This function will return an error if the Wii remote is disconnected or read failed.
     pub fn read_timeout(&self, buffer: &mut [u8], timeout_millis: usize) -> WiimoteResult<usize> {
-        if self.device.is_null() {
-            return Err(WiimoteError::Disconnected);
-        }
-
-        let read = unsafe {
-            wiimote_read_timeout(
-                self.device,
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                timeout_millis,
-            )
+        let mut device = match self.device.lock() {
+            Ok(device) => device,
+            Err(err) => err.into_inner(),
         };
-        if read >= 0 {
-            #[allow(clippy::cast_sign_loss)]
-            Ok(read as usize)
-        } else {
-            Err(WiimoteError::Disconnected)
+        if let Some(device) = device.as_mut() {
+            if let Some(bytes_read) = device.read_timeout(buffer, timeout_millis) {
+                return Ok(bytes_read);
+            }
         }
+        _ = device.take();
+        Err(WiimoteError::Disconnected)
     }
 
     fn initialize(&mut self) -> WiimoteResult<()> {
@@ -264,7 +199,7 @@ impl WiimoteDevice {
         Ok(())
     }
 
-    fn read_calibration_data(&self) -> WiimoteResult<AccelerometerCalibration> {
+    fn read_calibration_data(&mut self) -> WiimoteResult<AccelerometerCalibration> {
         // https://www.wiibrew.org/wiki/Wiimote#EEPROM_Memory
         // The four bytes starting at 0x0016 and 0x0020 store the calibrated zero offsets for the accelerometer
         // (high 8 bits of X,Y,Z in the first three bytes, low 2 bits packed in the fourth byte as --XXYYZZ).
@@ -292,12 +227,6 @@ impl WiimoteDevice {
 
 impl Drop for WiimoteDevice {
     fn drop(&mut self) {
-        if !self.device.is_null() {
-            unsafe {
-                wiimote_cleanup(self.device);
-            }
-        }
-
-        self.device = std::ptr::null_mut();
+        self.disconnected();
     }
 }

@@ -1,6 +1,11 @@
 mod common;
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "windows")]
 mod windows;
+
+#[cfg(target_os = "linux")]
+pub use linux::{wiimotes_scan, wiimotes_scan_cleanup, LinuxNativeWiimote as NativeWiimoteDevice};
 
 #[cfg(target_os = "windows")]
 pub use windows::{

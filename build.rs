@@ -1,14 +1,32 @@
-fn main() {
-    println!("cargo:rerun-if-changed=src/cpp");
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
 
-    if !cfg!(windows) {
-        let mut cfg = cc::Build::new();
-        cfg.cpp(true);
-        cfg.std("c++20");
-        cfg.file("src/cpp/wiimote_api.cpp");
-        cfg.file("src/cpp/wiimote_linux.cpp");
-        cfg.file("src/cpp/wiimote_scan_linux.cpp");
+fn main() {
+    let out_path = PathBuf::from("src/wiimote/native/linux/bindings.rs");
+
+    let mut bindings_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(out_path)
+        .unwrap();
+
+    if cfg!(target_os = "linux") {
+        println!("cargo:rerun-if-changed=src/bluetooth_linux.h");
+
+        let bindings = bindgen::Builder::default()
+            .header("src/bluetooth_linux.h")
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+            .generate()
+            .expect("Failed to generate bindings for libbluetooth");
+
+        bindings_file.write_all(b"#![allow(warnings)]\n\n").unwrap();
+
+        bindings
+            .write(Box::new(bindings_file))
+            .expect("Failed to write bindings for libbluetooth");
+
         println!("cargo:rustc-link-lib=bluetooth");
-        cfg.compile("wiimote_api");
     }
 }

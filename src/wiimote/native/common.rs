@@ -1,3 +1,6 @@
+// Some functions are unused on certain platforms
+#![allow(dead_code)]
+
 const WIIMOTE_VENDOR_ID: u16 = 0x057E;
 const WIIMOTE_PRODUCT_ID: u16 = 0x0306;
 const WIIMOTE_PLUS_PRODUCT_ID: u16 = 0x0330;

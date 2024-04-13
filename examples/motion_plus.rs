@@ -28,7 +28,7 @@ fn main() -> WiimoteResult<()> {
         let tx = tx.clone();
 
         std::thread::spawn(move || {
-            let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+            let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
 
             let led_report = OutputReport::PlayerLed(PlayerLedFlags::LED_2 | PlayerLedFlags::LED_3);
             let size = led_report.fill_buffer(false, &mut buffer);
@@ -103,7 +103,7 @@ fn handle_report(
 }
 
 fn set_reporting_mode_accelerometer_and_extension(d: &Arc<Mutex<WiimoteDevice>>) {
-    let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+    let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
 
     let reporting_mode = OutputReport::DataReportingMode(DataReporingMode {
         continuous: false,

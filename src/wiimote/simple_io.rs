@@ -11,7 +11,7 @@ pub fn read_16_bytes_sync(
     wiimote: &WiimoteDevice,
     addressing: Addressing,
 ) -> WiimoteResult<MemoryData> {
-    let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+    let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
 
     let memory_read_request = OutputReport::ReadMemory(addressing);
     let size = memory_read_request.fill_buffer(false, &mut buffer);
@@ -54,7 +54,7 @@ pub fn write_16_bytes_sync(
     addressing: Addressing,
     data: &[u8; 16],
 ) -> WiimoteResult<AcknowledgeData> {
-    let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+    let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
 
     let memory_write_request = OutputReport::WriteMemory(addressing, *data);
     let size = memory_write_request.fill_buffer(false, &mut buffer);

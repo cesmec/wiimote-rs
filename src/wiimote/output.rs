@@ -74,8 +74,8 @@ pub enum OutputReport {
 
 impl OutputReport {
     #[must_use]
-    pub fn to_array(&self, rumble: bool) -> ([u8; WIIMOTE_REPORT_BUFFER_SIZE], usize) {
-        let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+    pub fn to_array(&self, rumble: bool) -> ([u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE], usize) {
+        let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
         let length = self.fill_buffer(rumble, &mut buffer);
         (buffer, length)
     }

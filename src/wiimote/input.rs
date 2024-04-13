@@ -93,31 +93,31 @@ macro_rules! transmute_data {
 }
 
 impl InputReport {
-    fn from_status_information(value: [u8; WIIMOTE_REPORT_BUFFER_SIZE]) -> Self {
+    fn from_status_information(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
         let data = transmute_data!(value, StatusData);
         Self::StatusInformation(data)
     }
 
-    fn from_read_memory_data(value: [u8; WIIMOTE_REPORT_BUFFER_SIZE]) -> Self {
+    fn from_read_memory_data(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
         let data = transmute_data!(value, MemoryData);
         Self::ReadMemory(data)
     }
 
-    fn from_acknowledge(value: [u8; WIIMOTE_REPORT_BUFFER_SIZE]) -> Self {
+    fn from_acknowledge(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
         let data = transmute_data!(value, AcknowledgeData);
         Self::Acknowledge(data)
     }
 
-    fn from_data_report(value: [u8; WIIMOTE_REPORT_BUFFER_SIZE]) -> Self {
+    fn from_data_report(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
         let data = transmute_data!(value, WiimoteData);
         Self::DataReport(value[0], data)
     }
 }
 
-impl TryFrom<[u8; WIIMOTE_REPORT_BUFFER_SIZE]> for InputReport {
+impl TryFrom<[u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]> for InputReport {
     type Error = WiimoteError;
 
-    fn try_from(value: [u8; WIIMOTE_REPORT_BUFFER_SIZE]) -> Result<Self, Self::Error> {
+    fn try_from(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Result<Self, Self::Error> {
         match value[0] {
             STATUS_ID => Ok(Self::from_status_information(value)),
             READ_MEMORY_ID => Ok(Self::from_read_memory_data(value)),

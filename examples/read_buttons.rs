@@ -28,7 +28,7 @@ fn main() -> WiimoteResult<()> {
         reconnected_devices
             .iter()
             .try_for_each(|d| -> WiimoteResult<()> {
-                let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+                let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
 
                 let led_report =
                     OutputReport::PlayerLed(PlayerLedFlags::LED_1 | PlayerLedFlags::LED_3);
@@ -43,7 +43,7 @@ fn main() -> WiimoteResult<()> {
         let tx = tx.clone();
 
         std::thread::spawn(move || {
-            let mut buffer = [0u8; WIIMOTE_REPORT_BUFFER_SIZE];
+            let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
 
             let led_report = OutputReport::PlayerLed(PlayerLedFlags::LED_2 | PlayerLedFlags::LED_3);
             let size = led_report.fill_buffer(false, &mut buffer);

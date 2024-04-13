@@ -1,4 +1,0 @@
-If:
-  PathMatch: .*\.(cpp|h)
-CompileFlags:
-  Add: [-std=c++20, -DWIN32_LEAN_AND_MEAN, -DNOMINMAX]

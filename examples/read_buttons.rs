@@ -16,28 +16,10 @@ fn main() -> WiimoteResult<()> {
 
     let manager = WiimoteManager::get_instance();
 
-    let (new_devices, reconnected_devices) = {
+    let new_devices = {
         let manager = manager.lock().unwrap();
-        (
-            manager.new_devices_receiver(),
-            manager.reconnected_devices_receiver(),
-        )
+        manager.new_devices_receiver()
     };
-
-    std::thread::spawn(move || {
-        reconnected_devices
-            .iter()
-            .try_for_each(|d| -> WiimoteResult<()> {
-                let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-
-                let led_report =
-                    OutputReport::PlayerLed(PlayerLedFlags::LED_1 | PlayerLedFlags::LED_3);
-                let size = led_report.fill_buffer(false, &mut buffer);
-                d.lock().unwrap().write(&buffer[..size]).unwrap();
-                Ok(())
-            })
-            .unwrap();
-    });
 
     new_devices.iter().try_for_each(|d| -> WiimoteResult<()> {
         let tx = tx.clone();

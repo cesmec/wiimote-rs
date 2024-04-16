@@ -11,18 +11,12 @@ pub struct WiimoteSerialNumber(pub String);
 
 type MutexWiimoteDevice = Arc<Mutex<WiimoteDevice>>;
 
-struct ScanResult {
-    new_devices: Vec<MutexWiimoteDevice>,
-    reconnected_devices: Vec<MutexWiimoteDevice>,
-}
-
 /// Periodically checks for connections / disconnections of Wii remotes.
 pub struct WiimoteManager {
     devices: HashMap<WiimoteSerialNumber, MutexWiimoteDevice>,
     scan_thread: Option<JoinHandle<()>>,
     scan_interval: Duration,
     new_devices_receiver: crossbeam_channel::Receiver<MutexWiimoteDevice>,
-    reconnected_devices_receiver: crossbeam_channel::Receiver<MutexWiimoteDevice>,
 }
 
 impl WiimoteManager {
@@ -53,7 +47,6 @@ impl WiimoteManager {
 
     fn with_interval(interval: Duration) -> Arc<Mutex<Self>> {
         let (new_sender, new_devices_receiver) = crossbeam_channel::unbounded();
-        let (reconnected_sender, reconnected_devices_receiver) = crossbeam_channel::unbounded();
 
         let manager = {
             let mut manager = Self {
@@ -61,12 +54,11 @@ impl WiimoteManager {
                 scan_thread: None,
                 scan_interval: interval,
                 new_devices_receiver,
-                reconnected_devices_receiver,
             };
 
             // Immediately scan for devices
-            let scan_result = manager.scan();
-            for new_device in scan_result.new_devices {
+            let new_devices = manager.scan();
+            for new_device in new_devices {
                 let _ = new_sender.send(new_device);
             }
 
@@ -84,21 +76,10 @@ impl WiimoteManager {
                             Err(m) => m.into_inner(),
                         };
 
-                        let ScanResult {
-                            new_devices,
-                            reconnected_devices,
-                        } = manager.scan();
+                        let new_devices = manager.scan();
                         let send_result = new_devices
                             .into_iter()
                             .try_for_each(|device| new_sender.send(device));
-                        if send_result.is_err() {
-                            // Channel is disconnected, end scan thread
-                            return;
-                        }
-
-                        let send_result = reconnected_devices
-                            .into_iter()
-                            .try_for_each(|device| reconnected_sender.send(device));
                         if send_result.is_err() {
                             // Channel is disconnected, end scan thread
                             return;
@@ -124,23 +105,19 @@ impl WiimoteManager {
     }
 
     /// Scan the Wii remotes connected to your computer.
-    fn scan(&mut self) -> ScanResult {
+    fn scan(&mut self) -> Vec<MutexWiimoteDevice> {
         let mut native_devices = Vec::new();
         wiimotes_scan(&mut native_devices);
 
         let mut new_devices = Vec::new();
-        let mut reconnected_devices = Vec::new();
-
-        // TODO: iterate disconnected devices and mark them as disconnected
 
         for native_wiimote in native_devices {
             let identifier = native_wiimote.identifier();
             let serial_number = WiimoteSerialNumber(identifier);
             if let Some(existing_device) = self.devices.get(&serial_number) {
                 let result = existing_device.lock().unwrap().reconnect(native_wiimote);
-                match result {
-                    Ok(()) => reconnected_devices.push(Arc::clone(existing_device)),
-                    Err(error) => eprintln!("Failed to reconnect wiimote: {error:?}"),
+                if let Err(error) = result {
+                    eprintln!("Failed to reconnect wiimote: {error:?}");
                 }
             } else {
                 match WiimoteDevice::new(native_wiimote) {
@@ -154,10 +131,7 @@ impl WiimoteManager {
             }
         }
 
-        ScanResult {
-            new_devices,
-            reconnected_devices,
-        }
+        new_devices
     }
 
     /// Collection of managed Wii remotes, may contains disconnected ones.
@@ -170,12 +144,5 @@ impl WiimoteManager {
     #[must_use]
     pub fn new_devices_receiver(&self) -> crossbeam_channel::Receiver<MutexWiimoteDevice> {
         self.new_devices_receiver.clone()
-    }
-
-    /// Channel to receive reconnected Wii remotes.
-    /// Will return the same device as `new_devices_receiver` if the device was disconnected and reconnected.
-    #[must_use]
-    pub fn reconnected_devices_receiver(&self) -> crossbeam_channel::Receiver<MutexWiimoteDevice> {
-        self.reconnected_devices_receiver.clone()
     }
 }

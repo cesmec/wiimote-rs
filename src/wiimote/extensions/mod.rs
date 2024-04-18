@@ -45,14 +45,14 @@ impl WiimoteExtension {
         memory_write_buffer[0] = 0x55;
         let addressing = Addressing::control_registers(0xA4_00F0, 1);
         let ack = simple_io::write_16_bytes_sync(wiimote, addressing, &memory_write_buffer)?;
-        if ack.error_code == 7 {
+        if ack.error_code() == 7 {
             return Ok(None);
         }
 
         memory_write_buffer[0] = 0x00;
         let addressing = Addressing::control_registers(0xA4_00FB, 1);
         let ack = simple_io::write_16_bytes_sync(wiimote, addressing, &memory_write_buffer)?;
-        if ack.error_code == 7 {
+        if ack.error_code() == 7 {
             return Ok(None);
         }
 

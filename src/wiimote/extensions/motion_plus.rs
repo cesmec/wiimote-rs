@@ -266,7 +266,7 @@ impl MotionPlus {
         let mut memory_write_buffer = [0u8; 16];
         memory_write_buffer[0] = value;
         let ack = simple_io::write_16_bytes_sync(wiimote, addressing, &memory_write_buffer)?;
-        if ack.error_code == 7 {
+        if ack.error_code() == 7 {
             return Err(WiimoteDeviceError::InvalidData.into());
         }
 

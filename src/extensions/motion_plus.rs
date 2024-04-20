@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 use std::sync::atomic::AtomicBool;
 
+use crate::calibration::normalize;
+use crate::output::Addressing;
 use crate::prelude::*;
-use crate::wiimote::calibration::normalize;
-use crate::wiimote::simple_io;
+use crate::simple_io;
 
 #[derive(Debug, Clone, Copy)]
 pub enum MotionPlusMode {

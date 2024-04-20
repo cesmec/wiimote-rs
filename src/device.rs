@@ -1,10 +1,10 @@
 use std::sync::Mutex;
 
-use crate::prelude::*;
-use crate::wiimote::simple_io;
-
-use super::calibration::normalize;
-use super::native::{NativeWiimote, NativeWiimoteDevice};
+use crate::calibration::normalize;
+use crate::extensions::{MotionPlus, WiimoteExtension};
+use crate::native::{NativeWiimote, NativeWiimoteDevice};
+use crate::output::Addressing;
+use crate::{prelude::*, simple_io};
 
 #[derive(Debug, Default, Clone)]
 pub struct AccelerometerCalibration {

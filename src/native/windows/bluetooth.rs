@@ -12,7 +12,7 @@ use windows::Win32::Devices::Bluetooth::{
 };
 use windows::Win32::Foundation::{CloseHandle, ERROR_SUCCESS, HANDLE, TRUE};
 
-use crate::wiimote::native::common::is_wiimote_device_name;
+use crate::native::common::is_wiimote_device_name;
 
 use super::from_wstring;
 

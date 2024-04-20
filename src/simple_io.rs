@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
-use super::input::{AcknowledgeData, MemoryData};
+use crate::input::{AcknowledgeData, InputReport, MemoryData};
+use crate::output::{Addressing, OutputReport};
 
 const RETRY_COUNT: usize = 5;
 const READ_TIMEOUT: usize = 250;

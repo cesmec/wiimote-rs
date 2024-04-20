@@ -1,7 +1,8 @@
-mod motion_plus;
+pub(crate) mod motion_plus;
 
+use crate::output::Addressing;
 use crate::prelude::*;
-use crate::wiimote::simple_io;
+use crate::simple_io;
 
 pub use motion_plus::*;
 

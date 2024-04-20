@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 fn main() {
-    let out_path = PathBuf::from("src/wiimote/native/linux/bindings.rs");
+    let out_path = PathBuf::from("src/native/linux/bindings.rs");
 
     let mut bindings_file = OpenOptions::new()
         .create(true)
@@ -13,10 +13,11 @@ fn main() {
         .unwrap();
 
     if cfg!(target_os = "linux") {
-        println!("cargo:rerun-if-changed=src/bluetooth_linux.h");
+        const HEADER_FILE: &str = "src/native/linux/bluetooth_linux.h";
+        println!("cargo:rerun-if-changed={HEADER_FILE}");
 
         let bindings = bindgen::Builder::default()
-            .header("src/bluetooth_linux.h")
+            .header(HEADER_FILE)
             .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
             .generate()
             .expect("Failed to generate bindings for libbluetooth");

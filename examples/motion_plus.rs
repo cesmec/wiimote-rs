@@ -3,6 +3,8 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use wiimote_rs::input::InputReport;
+use wiimote_rs::output::{DataReporingMode, OutputReport, PlayerLedFlags};
 use wiimote_rs::prelude::*;
 
 fn main() -> WiimoteResult<()> {

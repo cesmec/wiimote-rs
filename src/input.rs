@@ -187,6 +187,9 @@ pub enum InputReport {
 macro_rules! transmute_data {
     ($value:expr, $type:ident) => {{
         const DATA_SIZE: usize = std::mem::size_of::<$type>();
+        if $value.len() < DATA_SIZE {
+            return Err(WiimoteDeviceError::InvalidData.into());
+        }
         let mut slice = [0u8; DATA_SIZE];
         slice.copy_from_slice(&$value[1..=DATA_SIZE]);
 
@@ -195,35 +198,51 @@ macro_rules! transmute_data {
 }
 
 impl InputReport {
-    fn from_status_information(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
+    fn from_status_information(value: &[u8]) -> WiimoteResult<Self> {
         let data = transmute_data!(value, StatusData);
-        Self::StatusInformation(data)
+        Ok(Self::StatusInformation(data))
     }
 
-    fn from_read_memory_data(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
+    fn from_read_memory_data(value: &[u8]) -> WiimoteResult<Self> {
         let data = transmute_data!(value, MemoryData);
-        Self::ReadMemory(data)
+        Ok(Self::ReadMemory(data))
     }
 
-    fn from_acknowledge(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
+    fn from_acknowledge(value: &[u8]) -> WiimoteResult<Self> {
         let data = transmute_data!(value, AcknowledgeData);
-        Self::Acknowledge(data)
+        Ok(Self::Acknowledge(data))
     }
 
-    fn from_data_report(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Self {
-        let data = transmute_data!(value, WiimoteData);
-        Self::DataReport(value[0], data)
+    fn from_data_report(value: &[u8]) -> Self {
+        const DATA_SIZE: usize = 21;
+        let mut data = [0u8; DATA_SIZE];
+        let bytes_to_copy = usize::min(value.len() - 1, DATA_SIZE);
+        data[..bytes_to_copy].copy_from_slice(&value[1..=bytes_to_copy]);
+
+        Self::DataReport(value[0], WiimoteData { data })
     }
 }
 
-impl TryFrom<[u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]> for InputReport {
+impl TryFrom<&[u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]> for InputReport {
     type Error = WiimoteError;
 
-    fn try_from(value: [u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE]) -> Result<Self, Self::Error> {
+        let slice_without_length: &[u8] = value.as_slice();
+        Self::try_from(slice_without_length)
+    }
+}
+
+impl TryFrom<&[u8]> for InputReport {
+    type Error = WiimoteError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.is_empty() {
+            return Err(WiimoteDeviceError::MissingData.into());
+        }
         match value[0] {
-            STATUS_ID => Ok(Self::from_status_information(value)),
-            READ_MEMORY_ID => Ok(Self::from_read_memory_data(value)),
-            ACKNOWLEDGE_ID => Ok(Self::from_acknowledge(value)),
+            STATUS_ID => Self::from_status_information(value),
+            READ_MEMORY_ID => Self::from_read_memory_data(value),
+            ACKNOWLEDGE_ID => Self::from_acknowledge(value),
             0x30..=0x3F => Ok(Self::from_data_report(value)),
             _ => Err(WiimoteDeviceError::InvalidData.into()),
         }
@@ -244,7 +263,7 @@ mod tests {
 
         data[6] = 24; // Battery level
 
-        let report = InputReport::try_from(data).unwrap();
+        let report = InputReport::try_from(&data).unwrap();
 
         assert!(matches!(report, InputReport::StatusInformation(_)));
         if let InputReport::StatusInformation(data) = report {
@@ -277,7 +296,7 @@ mod tests {
         data[5] = 0xAB; // Address
         data[6..22].copy_from_slice(b"1234567890123456"); // Data
 
-        let report = InputReport::try_from(data).unwrap();
+        let report = InputReport::try_from(&data).unwrap();
 
         assert!(matches!(report, InputReport::ReadMemory(_)));
         if let InputReport::ReadMemory(data) = report {
@@ -291,12 +310,13 @@ mod tests {
 
     #[test]
     fn test_acknowledge_report() {
-        let mut data = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-        data[0] = 0x22;
-        data[1] = 0b0000_0000; // no button
-        data[2] = 0b0000_0000; // no button
-        data[3] = 0x12; // report number
-        data[4] = 0xAB; // error code
+        let data: &[u8] = &[
+            0x22,
+            0b0000_0000, // no button
+            0b0000_0000, // no button
+            0x12,        // report number
+            0xAB,        // error code
+        ];
 
         let report = InputReport::try_from(data).unwrap();
 
@@ -310,10 +330,11 @@ mod tests {
 
     #[test]
     fn test_buttons_mode_0x30() {
-        let mut data = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-        data[0] = 0x30;
-        data[1] = 0b0000_0001; // D-Pad left
-        data[2] = 0b0000_0010; // One
+        let data: &[u8] = &[
+            0x30,
+            0b0000_0001, // D-Pad left
+            0b0000_0010, // One
+        ];
 
         let report = InputReport::try_from(data).unwrap();
 

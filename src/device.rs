@@ -1,9 +1,11 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use crate::calibration::normalize;
 use crate::extensions::{MotionPlus, WiimoteExtension};
+use crate::input::InputReport;
 use crate::native::{NativeWiimote, NativeWiimoteDevice};
-use crate::output::Addressing;
+use crate::output::{Addressing, OutputReport};
 use crate::{prelude::*, simple_io};
 
 #[derive(Debug, Default, Clone)]
@@ -64,6 +66,7 @@ pub struct WiimoteDevice {
     calibration_data: AccelerometerCalibration,
     motion_plus: Option<MotionPlus>,
     extension: Option<WiimoteExtension>,
+    rumble_enabled: AtomicBool,
 }
 
 unsafe impl Sync for WiimoteDevice {}
@@ -83,6 +86,7 @@ impl WiimoteDevice {
             calibration_data: AccelerometerCalibration::default(),
             motion_plus: None,
             extension: None,
+            rumble_enabled: AtomicBool::new(false),
         };
 
         wiimote.initialize()?;
@@ -137,14 +141,23 @@ impl WiimoteDevice {
     /// # Errors
     ///
     /// This function will return an error if the Wii remote is disconnected or write failed.
-    pub fn write(&self, data: &[u8]) -> WiimoteResult<usize> {
+    pub fn write(&self, output_report: &OutputReport) -> WiimoteResult<()> {
         let mut device = match self.device.lock() {
             Ok(device) => device,
             Err(err) => err.into_inner(),
         };
         if let Some(device) = device.as_mut() {
-            if let Some(bytes_written) = device.write(data) {
-                return Ok(bytes_written);
+            let rumble = if let OutputReport::Rumble(new_rumble) = output_report {
+                // Rumble is sent in every output report, so the new value needs to be stored.
+                self.rumble_enabled.store(*new_rumble, Ordering::Relaxed);
+                *new_rumble
+            } else {
+                self.rumble_enabled.load(Ordering::Relaxed)
+            };
+            let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
+            let size = output_report.fill_buffer(rumble, &mut buffer);
+            if device.write(&buffer[..size]).is_some() {
+                return Ok(());
             }
         }
         _ = device.take();
@@ -156,14 +169,15 @@ impl WiimoteDevice {
     /// # Errors
     ///
     /// This function will return an error if the Wii remote is disconnected or read failed.
-    pub fn read(&self, buffer: &mut [u8]) -> WiimoteResult<usize> {
+    pub fn read(&self) -> WiimoteResult<InputReport> {
         let mut device = match self.device.lock() {
             Ok(device) => device,
             Err(err) => err.into_inner(),
         };
         if let Some(device) = device.as_mut() {
-            if let Some(bytes_read) = device.read(buffer) {
-                return Ok(bytes_read);
+            let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
+            if let Some(bytes_read) = device.read(&mut buffer) {
+                return InputReport::try_from(&buffer[..bytes_read]);
             }
         }
         _ = device.take();
@@ -175,14 +189,15 @@ impl WiimoteDevice {
     /// # Errors
     ///
     /// This function will return an error if the Wii remote is disconnected or read failed.
-    pub fn read_timeout(&self, buffer: &mut [u8], timeout_millis: usize) -> WiimoteResult<usize> {
+    pub fn read_timeout(&self, timeout_millis: usize) -> WiimoteResult<InputReport> {
         let mut device = match self.device.lock() {
             Ok(device) => device,
             Err(err) => err.into_inner(),
         };
         if let Some(device) = device.as_mut() {
-            if let Some(bytes_read) = device.read_timeout(buffer, timeout_millis) {
-                return Ok(bytes_read);
+            let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
+            if let Some(bytes_read) = device.read_timeout(&mut buffer, timeout_millis) {
+                return InputReport::try_from(&buffer[..bytes_read]);
             }
         }
         _ = device.take();

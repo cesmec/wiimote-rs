@@ -30,11 +30,8 @@ fn main() -> WiimoteResult<()> {
         let tx = tx.clone();
 
         std::thread::spawn(move || {
-            let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-
             let led_report = OutputReport::PlayerLed(PlayerLedFlags::LED_2 | PlayerLedFlags::LED_3);
-            let size = led_report.fill_buffer(false, &mut buffer);
-            d.lock().unwrap().write(&buffer[..size]).unwrap();
+            d.lock().unwrap().write(&led_report).unwrap();
 
             let (accelerometer_calibration, motion_plus_calibration) = {
                 let wiimote = d.lock().unwrap();
@@ -55,9 +52,8 @@ fn main() -> WiimoteResult<()> {
             set_reporting_mode_accelerometer_and_extension(&d);
 
             loop {
-                let size = d.lock().unwrap().read_timeout(&mut buffer, 50).unwrap_or(0);
-                if size > 0 {
-                    let report = InputReport::try_from(buffer).unwrap();
+                let input_report = d.lock().unwrap().read_timeout(50);
+                if let Ok(report) = input_report {
                     handle_report(
                         &report,
                         &accelerometer_calibration,
@@ -105,12 +101,9 @@ fn handle_report(
 }
 
 fn set_reporting_mode_accelerometer_and_extension(d: &Arc<Mutex<WiimoteDevice>>) {
-    let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-
     let reporting_mode = OutputReport::DataReportingMode(DataReporingMode {
         continuous: false,
         mode: 0x35, // Core Buttons and Accelerometer with 16 Extension Bytes
     });
-    let size = reporting_mode.fill_buffer(false, &mut buffer);
-    d.lock().unwrap().write(&buffer[..size]).unwrap();
+    d.lock().unwrap().write(&reporting_mode).unwrap();
 }

@@ -65,7 +65,7 @@ pub enum OutputReport {
     /// Turn rumble on or off without any other changes.
     ///
     /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Rumble
-    Rumble,
+    Rumble(bool),
     /// Set the player LED lights.
     ///
     /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Player_LEDs
@@ -126,10 +126,11 @@ impl OutputReport {
     /// The rumble flag is used in all output reports to enable or disable the rumble motor.
     ///
     /// Returns the actual length of the data.
-    pub fn fill_buffer(&self, rumble: bool, buffer: &mut [u8]) -> usize {
+    pub fn fill_buffer(&self, mut rumble: bool, buffer: &mut [u8]) -> usize {
         buffer[1] = 0;
         let length = match self {
-            Self::Rumble => {
+            Self::Rumble(rumble_enabled) => {
+                rumble = *rumble_enabled;
                 buffer[0] = RUMBLE_ID;
                 2
             }
@@ -217,9 +218,9 @@ mod tests {
 
     #[test]
     fn test_rumble_report() {
-        let report = OutputReport::Rumble;
+        let report = OutputReport::Rumble(true);
 
-        let (buffer, size) = report.to_array(true);
+        let (buffer, size) = report.to_array(false); // value here is overwritten by report
 
         assert_eq!(size, 2);
         assert_eq!(buffer[0], RUMBLE_ID);

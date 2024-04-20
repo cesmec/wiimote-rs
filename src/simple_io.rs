@@ -12,19 +12,12 @@ pub fn read_16_bytes_sync(
     wiimote: &WiimoteDevice,
     addressing: Addressing,
 ) -> WiimoteResult<MemoryData> {
-    let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-
     let memory_read_request = OutputReport::ReadMemory(addressing);
-    let size = memory_read_request.fill_buffer(false, &mut buffer);
-    wiimote.write(&buffer[..size]).unwrap();
+    wiimote.write(&memory_read_request).unwrap();
 
     for _i in 0..RETRY_COUNT {
-        let size = wiimote.read_timeout(&mut buffer, READ_TIMEOUT)?;
-        if size == 0 {
-            return Err(WiimoteDeviceError::MissingData.into());
-        }
-
-        if let InputReport::ReadMemory(memory_data) = InputReport::try_from(buffer)? {
+        let input_report = wiimote.read_timeout(READ_TIMEOUT)?;
+        if let InputReport::ReadMemory(memory_data) = input_report {
             return Ok(memory_data);
         }
     }
@@ -55,19 +48,11 @@ pub fn write_16_bytes_sync(
     addressing: Addressing,
     data: &[u8; 16],
 ) -> WiimoteResult<AcknowledgeData> {
-    let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-
     let memory_write_request = OutputReport::WriteMemory(addressing, *data);
-    let size = memory_write_request.fill_buffer(false, &mut buffer);
-    wiimote.write(&buffer[..size]).unwrap();
+    wiimote.write(&memory_write_request).unwrap();
 
     for _i in 0..RETRY_COUNT {
-        let size = wiimote.read_timeout(&mut buffer, READ_TIMEOUT)?;
-        if size == 0 {
-            return Err(WiimoteDeviceError::MissingData.into());
-        }
-
-        let input_report = InputReport::try_from(buffer)?;
+        let input_report = wiimote.read_timeout(READ_TIMEOUT)?;
         if let InputReport::Acknowledge(acknowledge_data) = input_report {
             return Ok(acknowledge_data);
         }

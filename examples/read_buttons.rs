@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use wiimote_rs::input::InputReport;
 use wiimote_rs::output::{OutputReport, PlayerLedFlags};
 use wiimote_rs::prelude::*;
 
@@ -27,22 +26,17 @@ fn main() -> WiimoteResult<()> {
         let tx = tx.clone();
 
         std::thread::spawn(move || {
-            let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
-
             let led_report = OutputReport::PlayerLed(PlayerLedFlags::LED_2 | PlayerLedFlags::LED_3);
-            let size = led_report.fill_buffer(false, &mut buffer);
-            d.lock().unwrap().write(&buffer[..size]).unwrap();
+            d.lock().unwrap().write(&led_report).unwrap();
 
             std::thread::sleep(std::time::Duration::from_millis(1000));
 
             let led_report = OutputReport::PlayerLed(PlayerLedFlags::LED_1 | PlayerLedFlags::LED_4);
-            let size = led_report.fill_buffer(false, &mut buffer);
-            d.lock().unwrap().write(&buffer[..size]).unwrap();
+            d.lock().unwrap().write(&led_report).unwrap();
 
             loop {
-                let size = d.lock().unwrap().read_timeout(&mut buffer, 50).unwrap_or(0);
-                if size > 0 {
-                    let report = InputReport::try_from(buffer).unwrap();
+                let input_report = d.lock().unwrap().read_timeout(50);
+                if let Ok(report) = input_report {
                     tx.send(report).unwrap();
                 }
                 std::thread::sleep(Duration::from_millis(50));

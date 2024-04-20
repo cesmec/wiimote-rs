@@ -57,22 +57,64 @@ impl Addressing {
     }
 }
 
+/// An output report represents the data sent from the computer to the Wii remote.
+///
+/// The least significant bit of the first byte of any output report enables or disables the rumble.
 #[derive(Debug)]
 pub enum OutputReport {
+    /// Turn rumble on or off without any other changes.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Rumble
     Rumble,
+    /// Set the player LED lights.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Player_LEDs
     PlayerLed(PlayerLedFlags),
+    /// Set the data reporting mode of the input reports.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Data_Reporting
     DataReportingMode(DataReporingMode),
+    /// Enable or disable the IR camera (first step of enable sequence).
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#IR_Camera
     IrCameraEnable(bool),
+    /// Enable or disable the built-in speaker.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Speaker
     SpeakerEnable(bool),
+    /// Request a status input report from the Wii remote.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#0x20:_Status
     StatusRequest,
+    /// Write up to 16 bytes of data to the Wii remote's memory or registers.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Memory_and_Registers
     WriteMemory(Addressing, [u8; 16]),
+    /// Read data from the Wii remote's memory or registers.
+    /// The data is returned as `InputReport::ReadMemory` reports in chunks of 16 bytes.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Memory_and_Registers
     ReadMemory(Addressing),
+    /// Send data to the built-in speaker.
+    /// The first byte is the length of the data, followed by the actual data.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Speaker
     SpeakerData(u8, [u8; 20]),
+    /// Mute or unmute the built-in speaker.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Speaker
     SpeakerMute(bool),
+    /// Second step of IR camera enable sequence.
+    ///
+    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#IR_Camera
     IrCameraEnable2(bool),
 }
 
 impl OutputReport {
+    /// Converts the output report to a byte array.
+    /// The rumble flag is used in all output reports to enable or disable the rumble motor.
+    ///
+    /// Returns a tuple containing the byte array and the actual length of the data.
     #[must_use]
     pub fn to_array(&self, rumble: bool) -> ([u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE], usize) {
         let mut buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
@@ -80,6 +122,10 @@ impl OutputReport {
         (buffer, length)
     }
 
+    /// Fills an existing buffer with the output report data.
+    /// The rumble flag is used in all output reports to enable or disable the rumble motor.
+    ///
+    /// Returns the actual length of the data.
     pub fn fill_buffer(&self, rumble: bool, buffer: &mut [u8]) -> usize {
         buffer[1] = 0;
         let length = match self {
@@ -162,5 +208,89 @@ impl OutputReport {
             buffer[1] |= 0x01;
         }
         length
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rumble_report() {
+        let report = OutputReport::Rumble;
+
+        let (buffer, size) = report.to_array(true);
+
+        assert_eq!(size, 2);
+        assert_eq!(buffer[0], RUMBLE_ID);
+        assert_eq!(buffer[1], 0b0000_0001);
+    }
+
+    #[test]
+    fn test_rumble_in_player_led_report() {
+        let report = OutputReport::PlayerLed(PlayerLedFlags::LED_2);
+
+        let (buffer, size) = report.to_array(true);
+
+        assert_eq!(size, 2);
+        assert_eq!(buffer[0], PLAYER_LED_ID);
+        assert_eq!(buffer[1], 0b0010_0001);
+    }
+
+    #[test]
+    fn test_player_led_report() {
+        let report = OutputReport::PlayerLed(PlayerLedFlags::LED_1 | PlayerLedFlags::LED_3);
+
+        let (buffer, size) = report.to_array(false);
+
+        assert_eq!(size, 2);
+        assert_eq!(buffer[0], PLAYER_LED_ID);
+        assert_eq!(buffer[1], 0b0101_0000);
+    }
+
+    #[test]
+    fn test_read_report() {
+        let addressing = Addressing::control_registers(0xFF12_3456, 8);
+        let report = OutputReport::ReadMemory(addressing);
+
+        let (buffer, size) = report.to_array(true);
+
+        assert_eq!(size, 7);
+        assert_eq!(buffer[0], READ_MEMORY_ID);
+        assert_eq!(buffer[1], 0x04 | 0b0000_0001); // control register and rumble
+        assert_eq!(buffer[2], 0x12);
+        assert_eq!(buffer[3], 0x34);
+        assert_eq!(buffer[4], 0x56);
+        assert_eq!(buffer[5], 0);
+        assert_eq!(buffer[6], 8);
+    }
+
+    #[test]
+    fn test_write_report() {
+        let addressing = Addressing::eeprom(0x89AB_CD00, 11);
+        let report = OutputReport::WriteMemory(addressing, *b"12345678901\0\0\0\0\0");
+
+        let (buffer, size) = report.to_array(false);
+
+        assert_eq!(size, 22);
+        assert_eq!(buffer[0], WRITE_MEMORY_ID);
+        assert_eq!(buffer[1], 0); // eeprom and no rumble
+        assert_eq!(buffer[2], 0xAB);
+        assert_eq!(buffer[3], 0xCD);
+        assert_eq!(buffer[4], 0x00);
+        assert_eq!(buffer[5], 11);
+        assert_eq!(&buffer[6..=21], *b"12345678901\0\0\0\0\0");
+    }
+
+    #[test]
+    fn test_speaker_data_report() {
+        let report = OutputReport::SpeakerData(20, *b"12345678901234567890");
+
+        let (buffer, size) = report.to_array(true);
+
+        assert_eq!(size, 22);
+        assert_eq!(buffer[0], SPEAKER_DATA_ID);
+        assert_eq!(buffer[1], (20 << 3) | 1); // length and rumble
+        assert_eq!(&buffer[2..=21], *b"12345678901234567890");
     }
 }

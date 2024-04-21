@@ -1,9 +1,13 @@
 [package]
 name = "wiimote-rs"
+description = "Rust library to communicate with Wii remotes"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 authors = ["cesmec"]
+repository = "https://github.com/cesmec/wiimote-rs"
+readme = "README.md"
+exclude = ["/.github"]
 
 [dependencies]
 bitflags = "2.4"

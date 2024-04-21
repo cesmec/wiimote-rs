@@ -29,4 +29,3 @@ windows = { version = "0.54.0", features = [
 
 [build-dependencies]
 bindgen = "0.69.4"
-cc = "1.0"

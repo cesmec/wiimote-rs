@@ -64,49 +64,49 @@ impl Addressing {
 pub enum OutputReport {
     /// Turn rumble on or off without any other changes.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Rumble
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Rumble>
     Rumble(bool),
     /// Set the player LED lights.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Player_LEDs
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Player_LEDs>
     PlayerLed(PlayerLedFlags),
     /// Set the data reporting mode of the input reports.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Data_Reporting
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Data_Reporting>
     DataReportingMode(DataReporingMode),
     /// Enable or disable the IR camera (first step of enable sequence).
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#IR_Camera
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#IR_Camera>
     IrCameraEnable(bool),
     /// Enable or disable the built-in speaker.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Speaker
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Speaker>
     SpeakerEnable(bool),
     /// Request a status input report from the Wii remote.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#0x20:_Status
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#0x20:_Status>
     StatusRequest,
     /// Write up to 16 bytes of data to the Wii remote's memory or registers.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Memory_and_Registers
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Memory_and_Registers>
     WriteMemory(Addressing, [u8; 16]),
     /// Read data from the Wii remote's memory or registers.
     /// The data is returned as `InputReport::ReadMemory` reports in chunks of 16 bytes.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Memory_and_Registers
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Memory_and_Registers>
     ReadMemory(Addressing),
     /// Send data to the built-in speaker.
     /// The first byte is the length of the data, followed by the actual data.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Speaker
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Speaker>
     SpeakerData(u8, [u8; 20]),
     /// Mute or unmute the built-in speaker.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Speaker
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Speaker>
     SpeakerMute(bool),
     /// Second step of IR camera enable sequence.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#IR_Camera
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#IR_Camera>
     IrCameraEnable2(bool),
 }
 

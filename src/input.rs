@@ -160,19 +160,19 @@ pub enum InputReport {
     /// Can be requested by sending an output report with ID 0x15 and is automatically
     /// sent when the Extension is connected or disconnected.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#0x20:_Status
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#0x20:_Status>
     StatusInformation(StatusData),
     /// Read memory data report (ID 0x21).
     ///
     /// Result of a read memory request (output report ID 0x17).
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#0x21:_Read_Memory_Data
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#0x21:_Read_Memory_Data>
     ReadMemory(MemoryData),
     /// Acknowledge report (ID 0x22).
     ///
     /// Sent as a response to an output report with a corresponding result or error.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#0x22:_Acknowledge_output_report.2C_return_function_result
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#0x22:_Acknowledge_output_report.2C_return_function_result>
     Acknowledge(AcknowledgeData),
     /// Data report (IDs 0x30-0x3F).
     ///
@@ -180,7 +180,7 @@ pub enum InputReport {
     /// The exact data depends on the report type requested by the output report 0x12.
     /// Defaults to 0x30 which only contains the button data.
     ///
-    /// WiiBrew Documentation: https://www.wiibrew.org/wiki/Wiimote#Data_Reporting
+    /// WiiBrew Documentation: <https://www.wiibrew.org/wiki/Wiimote#Data_Reporting>
     DataReport(u8, WiimoteData),
 }
 

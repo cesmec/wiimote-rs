@@ -6,8 +6,11 @@ use crate::extensions::{MotionPlus, WiimoteExtension};
 use crate::input::InputReport;
 use crate::native::{NativeWiimote, NativeWiimoteDevice};
 use crate::output::{Addressing, OutputReport};
-use crate::{prelude::*, simple_io};
+use crate::prelude::*;
+use crate::simple_io;
 
+/// The calibration data for the accelerometer of the Wii remote.
+/// Can be used to convert raw accelerometer data to acceleration values.
 #[derive(Debug, Default, Clone)]
 pub struct AccelerometerCalibration {
     x_zero_offset: u16,
@@ -19,6 +22,7 @@ pub struct AccelerometerCalibration {
 }
 
 impl AccelerometerCalibration {
+    /// Returns the acceleration values from the raw data using the current calibration.
     #[must_use]
     pub fn get_acceleration(&self, data: &AccelerometerData) -> (f64, f64, f64) {
         let x = normalize(data.x, 10, self.x_zero_offset, self.x_gravity, 10);
@@ -28,6 +32,7 @@ impl AccelerometerCalibration {
     }
 }
 
+/// The raw accelerometer data from the Wii remote.
 pub struct AccelerometerData {
     x: u16,
     y: u16,
@@ -60,6 +65,7 @@ impl AccelerometerData {
     }
 }
 
+/// A `WiimoteDevice` can be used to communicate with a Wii remote.
 pub struct WiimoteDevice {
     device: Mutex<Option<NativeWiimoteDevice>>,
     identifier: String,
@@ -93,36 +99,39 @@ impl WiimoteDevice {
         Ok(wiimote)
     }
 
+    /// Returns the unique identifier of the Wii remote.
     #[must_use]
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
 
+    /// Returns the accelerometer calibration data of the Wii remote.
+    /// This data is used to convert raw accelerometer data to acceleration values.
     #[must_use]
     pub const fn accelerometer_calibration(&self) -> &AccelerometerCalibration {
         &self.calibration_data
     }
 
+    /// Returns the `MotionPlus` extension of the Wii remote if connected.
     #[must_use]
     pub const fn motion_plus(&self) -> Option<&MotionPlus> {
         self.motion_plus.as_ref()
     }
 
+    /// Returns data about the Wii remote extension if connected.
     #[must_use]
     pub const fn extension(&self) -> Option<&WiimoteExtension> {
         self.extension.as_ref()
     }
 
+    /// Returns whether the Wii remote is currently connected.
+    /// The Wii remote is automatically re-assigned to this object when reconnected.
     #[must_use]
     pub fn is_connected(&self) -> bool {
         self.device
             .lock()
             .map(|device| device.is_some())
             .unwrap_or(false)
-    }
-
-    pub fn disconnected(&self) {
-        _ = self.device.lock().map(|mut device| device.take());
     }
 
     /// Reconnects the Wii remote from a `NativeWiimoteDevice`.
@@ -237,6 +246,10 @@ impl WiimoteDevice {
             y_gravity: ((data[5] as u16) << 2) | ((data[7] as u16) >> 2 & 0b11),
             z_gravity: ((data[6] as u16) << 2) | ((data[7] as u16) & 0b11),
         })
+    }
+
+    fn disconnected(&self) {
+        _ = self.device.lock().map(|mut device| device.take());
     }
 }
 

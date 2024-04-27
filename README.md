@@ -1,6 +1,9 @@
 # wiimote-rs
 
+[![crates.io](https://img.shields.io/crates/v/wiimote-rs.svg)](https://crates.io/crates/wiimote-rs)
 [![CI](https://github.com/cesmec/wiimote-rs/workflows/CI/badge.svg)](https://github.com/cesmec/wiimote-rs/actions)
+[![Documentation](https://docs.rs/wiimote-rs/badge.svg)](https://docs.rs/wiimote-rs)
+![License](https://img.shields.io/crates/l/wiimote-rs.svg)
 
 A Rust library to communicate with Wii remotes over Bluetooth.
 

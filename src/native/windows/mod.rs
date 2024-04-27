@@ -16,9 +16,8 @@ use windows::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForSingleO
 use windows::Win32::System::IO::{GetOverlappedResult, OVERLAPPED};
 
 use self::bluetooth::{disconnect_wiimotes, register_wiimotes_as_hid_devices};
-use self::hid::{enumerate_hid_devices, open_wiimote_device};
+use self::hid::{enumerate_wiimote_hid_devices, open_wiimote_device};
 
-use super::common::is_wiimote;
 use super::NativeWiimote;
 
 static mut WIIMOTES_HANDLED: Lazy<Mutex<HashSet<String>>> =
@@ -44,29 +43,27 @@ pub fn wiimotes_scan(wiimotes: &mut Vec<WindowsNativeWiimote>) {
     unsafe {
         _ = register_wiimotes_as_hid_devices();
 
-        _ = enumerate_hid_devices(|device_info, device_path| {
-            if is_wiimote(device_info.vendor_id(), device_info.product_id()) {
-                let mut wiimotes_handled = match WIIMOTES_HANDLED.lock() {
-                    Ok(wiimotes_handled) => wiimotes_handled,
-                    Err(wiimotes_handled) => wiimotes_handled.into_inner(),
-                };
+        _ = enumerate_wiimote_hid_devices(|device_info, device_path| {
+            let mut wiimotes_handled = match WIIMOTES_HANDLED.lock() {
+                Ok(wiimotes_handled) => wiimotes_handled,
+                Err(wiimotes_handled) => wiimotes_handled.into_inner(),
+            };
 
-                if !wiimotes_handled.contains(device_info.serial_number()) {
-                    open_wiimote_device(device_path, (GENERIC_READ | GENERIC_WRITE).0).map_or_else(
-                        |_| {
-                            eprintln!("Failed to connect to wiimote");
-                        },
-                        |wiimote_handle| {
-                            let serial_number = device_info.serial_number();
-                            wiimotes_handled.insert(serial_number.to_string());
-                            wiimotes.push(WindowsNativeWiimote::new(
-                                wiimote_handle,
-                                serial_number.to_string(),
-                                device_info.capabilities(),
-                            ));
-                        },
-                    );
-                }
+            if !wiimotes_handled.contains(device_info.serial_number()) {
+                open_wiimote_device(device_path, (GENERIC_READ | GENERIC_WRITE).0).map_or_else(
+                    |_| {
+                        eprintln!("Failed to connect to wiimote");
+                    },
+                    |wiimote_handle| {
+                        let serial_number = device_info.serial_number();
+                        wiimotes_handled.insert(serial_number.to_string());
+                        wiimotes.push(WindowsNativeWiimote::new(
+                            wiimote_handle,
+                            serial_number.to_string(),
+                            device_info.capabilities(),
+                        ));
+                    },
+                );
             }
         });
     }

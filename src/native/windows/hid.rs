@@ -1,6 +1,8 @@
+use std::collections::HashSet;
 use std::ffi::c_void;
 use std::{iter, mem};
 
+use once_cell::sync::Lazy;
 use windows::core::PCWSTR;
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
     CM_Get_Device_Interface_ListW, CM_Get_Device_Interface_List_SizeW,
@@ -14,6 +16,8 @@ use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
+
+use crate::native::common::is_wiimote;
 
 use super::from_wstring;
 
@@ -91,10 +95,12 @@ pub(super) unsafe fn open_wiimote_device(
     )
 }
 
-pub(super) unsafe fn enumerate_hid_devices<F>(mut callback: F) -> Result<(), String>
+pub(super) unsafe fn enumerate_wiimote_hid_devices<F>(mut callback: F) -> Result<(), String>
 where
     F: FnMut(&DeviceInfo, &str),
 {
+    static mut UNRELATED_DEVICES: Lazy<HashSet<String>> = Lazy::new(HashSet::new);
+
     let hid_id = HidD_GetHidGuid();
 
     let mut length = 0;
@@ -128,9 +134,16 @@ where
 
         let device_path = &device_list[start_index..end_index];
         let device_path_str = from_wstring(device_path);
+        if UNRELATED_DEVICES.contains(&device_path_str) {
+            continue;
+        }
 
         if let Some(device_info) = DeviceInfo::from_device_path(&device_path_str) {
-            callback(&device_info, &device_path_str);
+            if is_wiimote(device_info.vendor_id(), device_info.product_id()) {
+                callback(&device_info, &device_path_str);
+            } else {
+                UNRELATED_DEVICES.insert(device_path_str);
+            }
         }
         start_index = end_index;
     }

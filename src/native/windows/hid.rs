@@ -133,19 +133,19 @@ where
         let end_index = start_index + device_path_length + 1;
 
         let device_path = &device_list[start_index..end_index];
-        let device_path_str = from_wstring(device_path);
-        if UNRELATED_DEVICES.contains(&device_path_str) {
+        let device_path_string = from_wstring(device_path);
+        start_index = end_index;
+        if UNRELATED_DEVICES.contains(&device_path_string) {
             continue;
         }
 
-        if let Some(device_info) = DeviceInfo::from_device_path(&device_path_str) {
+        if let Some(device_info) = DeviceInfo::from_device_path(&device_path_string) {
             if is_wiimote(device_info.vendor_id(), device_info.product_id()) {
-                callback(&device_info, &device_path_str);
+                callback(&device_info, &device_path_string);
             } else {
-                UNRELATED_DEVICES.insert(device_path_str);
+                UNRELATED_DEVICES.insert(device_path_string);
             }
         }
-        start_index = end_index;
     }
     Ok(())
 }

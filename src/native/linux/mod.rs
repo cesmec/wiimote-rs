@@ -160,6 +160,7 @@ impl NativeWiimote for LinuxNativeWiimote {
     }
 
     fn read_timeout(&mut self, buffer: &mut [u8], timeout_millis: usize) -> Option<usize> {
+        const TIMED_OUT: i32 = 0;
         let mut read_poll = unsafe { std::mem::zeroed::<pollfd>() };
         read_poll.fd = self.data_socket;
         read_poll.events = POLLIN;
@@ -167,7 +168,10 @@ impl NativeWiimote for LinuxNativeWiimote {
         let mut fds = [read_poll];
 
         let result = unsafe { poll(fds.as_mut_ptr(), 1, timeout_millis as _) };
-        if result <= 0 {
+        if result == TIMED_OUT {
+            return Some(0);
+        }
+        if result < 0 {
             return None;
         }
 

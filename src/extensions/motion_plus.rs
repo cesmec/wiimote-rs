@@ -211,7 +211,9 @@ impl MotionPlus {
         readings: &[MotionPlusData],
     ) -> Option<MotionPlusCalibration> {
         let read_count = readings.len();
-        let mut data = (0, 0, 0);
+        let mut yaw_sum = 0;
+        let mut roll_sum = 0;
+        let mut pitch_sum = 0;
 
         for reading in readings {
             if !reading.yaw_slow || !reading.roll_slow || !reading.pitch_slow {
@@ -219,22 +221,26 @@ impl MotionPlus {
                 return None;
             }
 
-            data.0 += reading.yaw as u64;
-            data.1 += reading.roll as u64;
-            data.2 += reading.pitch as u64;
+            yaw_sum += reading.yaw as u64;
+            roll_sum += reading.roll as u64;
+            pitch_sum += reading.pitch as u64;
         }
 
         #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
         if read_count >= 8 {
-            let average_yaw = ((data.0 as f64 / read_count as f64).round() as u16) << 2; // Calibration has 16 bits, values only 14
-            let average_roll = ((data.1 as f64 / read_count as f64).round() as u16) << 2;
-            let average_pitch = ((data.2 as f64 / read_count as f64).round() as u16) << 2;
+            let average_yaw = ((yaw_sum as f64 / read_count as f64).round() as u16) << 2; // Calibration has 16 bits, values only 14
+            let average_roll = ((roll_sum as f64 / read_count as f64).round() as u16) << 2;
+            let average_pitch = ((pitch_sum as f64 / read_count as f64).round() as u16) << 2;
 
             let mut calibration = self.calibration.borrow_mut();
 
             calibration.slow.yaw_zero_value = average_yaw;
             calibration.slow.roll_zero_value = average_roll;
             calibration.slow.pitch_zero_value = average_pitch;
+
+            calibration.fast.yaw_zero_value = average_yaw;
+            calibration.fast.roll_zero_value = average_roll;
+            calibration.fast.pitch_zero_value = average_pitch;
             Some(calibration.clone())
         } else {
             None

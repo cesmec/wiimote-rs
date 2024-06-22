@@ -121,7 +121,7 @@ impl TryFrom<[u8; 6]> for MotionPlusData {
         // https://www.wiibrew.org/wiki/Wiimote/Extension_Controllers/Wii_Motion_Plus#Nunchuck_pass-through_mode
         // Bit 1 of Byte 5 is used to determine which type of report is received:
         // it is 1 when it contains MotionPlus Data and 0 when it contains extension data.
-        let is_motion_plus_data = value[5] & 0b10 == 0b10;
+        let is_motion_plus_data = value[5] & 0b10 != 0;
         if !is_motion_plus_data {
             return Err(());
         }
@@ -131,8 +131,8 @@ impl TryFrom<[u8; 6]> for MotionPlusData {
             roll: u16::from_be_bytes([value[4] >> 2, value[1]]),
             pitch: u16::from_be_bytes([value[5] >> 2, value[2]]),
             yaw_slow: value[3] & 0b0010 != 0,
-            roll_slow: value[3] & 0b0001 != 0,
-            pitch_slow: value[4] & 0b0010 != 0,
+            roll_slow: value[4] & 0b0010 != 0,
+            pitch_slow: value[3] & 0b0001 != 0,
             extension_connected: value[4] & 0b0001 != 0,
         })
     }

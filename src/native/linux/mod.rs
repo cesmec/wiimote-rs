@@ -2,6 +2,7 @@ mod bindings;
 
 use std::ffi::c_int;
 
+use nix::errno::Errno;
 use nix::libc::{
     connect, poll, pollfd, sockaddr, socket, write, AF_BLUETOOTH, POLLIN, SOCK_SEQPACKET,
 };
@@ -27,14 +28,17 @@ const DATA_PIPE_ID: u16 = 0x0013;
 unsafe fn connect_socket(address: sockaddr_l2) -> Option<c_int> {
     let socket_fd = socket(AF_BLUETOOTH as _, SOCK_SEQPACKET as _, BTPROTO_L2CAP as _);
     if socket_fd < 0 {
-        eprintln!("Unable to open socket to Wiimote");
+        eprintln!("Unable to open socket to Wiimote: {}", Errno::last().desc());
         return None;
     }
 
     let address_ptr = std::ptr::addr_of!(address).cast::<sockaddr>();
     let address_size = std::mem::size_of_val(&address);
     if connect(socket_fd, address_ptr, address_size as _) < 0 {
-        eprintln!("Unable to connect channel of Wiimote");
+        eprintln!(
+            "Unable to connect channel of Wiimote: {}",
+            Errno::last().desc()
+        );
         _ = close(socket_fd);
         return None;
     }
@@ -77,7 +81,10 @@ pub fn wiimotes_scan(wiimotes: &mut Vec<LinuxNativeWiimote>) {
         let bt_device_id = hci_get_route(std::ptr::null_mut());
         let bt_socket = hci_open_dev(bt_device_id);
         if bt_device_id < 0 || bt_socket < 0 {
-            eprintln!("Failed to open default bluetooth device");
+            eprintln!(
+                "Failed to open default bluetooth device: {}",
+                Errno::last().desc()
+            );
             return;
         }
 
@@ -91,7 +98,10 @@ pub fn wiimotes_scan(wiimotes: &mut Vec<LinuxNativeWiimote>) {
         );
         if device_count < 0 {
             _ = close(bt_socket);
-            eprintln!("hci_inquiry failed while scanning for bluetooth devices");
+            eprintln!(
+                "hci_inquiry failed while scanning for bluetooth devices: {}",
+                Errno::last().desc()
+            );
             return;
         }
 

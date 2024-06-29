@@ -148,13 +148,27 @@ impl LinuxNativeWiimote {
             data_socket,
         }
     }
-}
 
-const INPUT_PREFIX: u8 = 0xA1;
-const OUTPUT_PREFIX: u8 = 0xA2;
+    fn read_timeout_impl(
+        &mut self,
+        buffer: &mut [u8],
+        timeout_millis: Option<i32>,
+    ) -> Option<usize> {
+        const TIMED_OUT: i32 = 0;
+        let mut read_poll = unsafe { std::mem::zeroed::<pollfd>() };
+        read_poll.fd = self.data_socket;
+        read_poll.events = POLLIN;
 
-impl NativeWiimote for LinuxNativeWiimote {
-    fn read(&mut self, buffer: &mut [u8]) -> Option<usize> {
+        let mut fds = [read_poll];
+
+        let result = unsafe { poll(fds.as_mut_ptr(), 1, timeout_millis.unwrap_or(-1)) };
+        if result == TIMED_OUT {
+            return Some(0);
+        }
+        if result < 0 {
+            return None;
+        }
+
         let mut read_buffer = [0u8; WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE];
 
         let max_data_size = usize::min(read_buffer.len() - 1, buffer.len());
@@ -168,24 +182,21 @@ impl NativeWiimote for LinuxNativeWiimote {
 
         Some(bytes_read - 1)
     }
+}
+
+const INPUT_PREFIX: u8 = 0xA1;
+const OUTPUT_PREFIX: u8 = 0xA2;
+
+impl NativeWiimote for LinuxNativeWiimote {
+    fn read(&mut self, buffer: &mut [u8]) -> Option<usize> {
+        self.read_timeout_impl(buffer, None)
+    }
 
     fn read_timeout(&mut self, buffer: &mut [u8], timeout_millis: usize) -> Option<usize> {
-        const TIMED_OUT: i32 = 0;
-        let mut read_poll = unsafe { std::mem::zeroed::<pollfd>() };
-        read_poll.fd = self.data_socket;
-        read_poll.events = POLLIN;
-
-        let mut fds = [read_poll];
-
-        let result = unsafe { poll(fds.as_mut_ptr(), 1, timeout_millis as _) };
-        if result == TIMED_OUT {
-            return Some(0);
-        }
-        if result < 0 {
-            return None;
-        }
-
-        self.read(buffer)
+        self.read_timeout_impl(
+            buffer,
+            Some(i32::try_from(timeout_millis).expect("Invalid read timeout")),
+        )
     }
 
     fn write(&mut self, buffer: &[u8]) -> Option<usize> {

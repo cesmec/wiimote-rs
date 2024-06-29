@@ -15,7 +15,7 @@ use windows::Win32::Storage::FileSystem::{ReadFile, WriteFile};
 use windows::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForSingleObject, INFINITE};
 use windows::Win32::System::IO::{GetOverlappedResult, OVERLAPPED};
 
-use self::bluetooth::{disconnect_wiimotes, register_wiimotes_as_hid_devices};
+use self::bluetooth::{disconnect_wiimotes, forget_wiimote, register_wiimotes_as_hid_devices};
 use self::hid::{enumerate_wiimote_hid_devices, open_wiimote_device};
 
 use super::NativeWiimote;
@@ -228,6 +228,7 @@ impl Drop for WindowsNativeWiimote {
             _ = CloseHandle(self.overlapped_write.hEvent);
             _ = CloseHandle(self.handle);
 
+            forget_wiimote(&self.identifier);
             let mut wiimotes_handled = match WIIMOTES_HANDLED.lock() {
                 Ok(wiimotes_handled) => wiimotes_handled,
                 Err(wiimotes_handled) => wiimotes_handled.into_inner(),

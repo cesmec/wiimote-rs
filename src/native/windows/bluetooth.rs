@@ -135,6 +135,16 @@ pub(super) fn register_wiimotes_as_hid_devices() -> Result<(), String> {
     }
 }
 
+pub(super) fn forget_wiimote(identifier: &str) {
+    unsafe {
+        let mut connected_wiimotes = match CONNECTED_WIIMOTES.lock() {
+            Ok(connected_wiimotes) => connected_wiimotes,
+            Err(connected_wiimotes) => connected_wiimotes.into_inner(),
+        };
+        connected_wiimotes.remove(identifier);
+    }
+}
+
 pub(super) unsafe fn disconnect_wiimotes() {
     _ = enumerate_bluetooth_radios(|radio, _radio_info| {
         let connected_wiimotes = match CONNECTED_WIIMOTES.lock() {

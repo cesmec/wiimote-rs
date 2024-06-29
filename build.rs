@@ -17,6 +17,5 @@ fn main() {
     println!("cargo:rustc-link-lib=bluetooth");
 }
 
-#[cfg(target_os = "windows")]
-fn main() {
-}
+#[cfg(not(target_os = "linux"))]
+fn main() {}

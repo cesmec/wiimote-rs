@@ -1,5 +1,8 @@
 name: Release
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -38,11 +41,6 @@ jobs:
 
     - if: ${{ !inputs.dry_run }}
       name: Create release
-      uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
-      with:
-        allowUpdates: true
-        name: v${{ env.PACKAGE_VERSION }}
-        tag: v${{ env.PACKAGE_VERSION }}
-        commit: ${{ github.sha }}
-        prerelease: true
-        token: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh release create "v$PACKAGE_VERSION" --title "v$PACKAGE_VERSION"

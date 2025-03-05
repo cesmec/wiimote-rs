@@ -217,9 +217,11 @@ impl WiimoteDevice {
         self.motion_plus = None;
         self.extension = None;
 
-        self.calibration_data = self.read_calibration_data()?;
-        self.motion_plus = MotionPlus::detect(self)?;
         self.extension = WiimoteExtension::detect(self)?;
+        if !matches!(self.extension, Some(WiimoteExtension::BalanceBoard)) {
+            self.calibration_data = self.read_calibration_data()?;
+        }
+        self.motion_plus = MotionPlus::detect(self)?;
         Ok(())
     }
 
@@ -229,6 +231,7 @@ impl WiimoteDevice {
         // (high 8 bits of X,Y,Z in the first three bytes, low 2 bits packed in the fourth byte as --XXYYZZ).
         // The four bytes at 0x001A and 0x24 store the force of gravity on those axes.
         let data = simple_io::read_16_bytes_sync_checked(self, Addressing::eeprom(0x0016, 10))?;
+        eprintln!("{:?}", data);
 
         let mut checksum = 0x55u8;
         for byte in &data[..9] {

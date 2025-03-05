@@ -8,7 +8,7 @@ mod manager;
 mod native;
 pub mod output;
 mod result;
-mod simple_io;
+pub mod simple_io;
 
 pub const WIIMOTE_DEFAULT_REPORT_BUFFER_SIZE: usize = 32;
 

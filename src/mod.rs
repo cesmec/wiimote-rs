@@ -5,7 +5,7 @@ pub mod input;
 mod manager;
 mod native;
 pub mod output;
-mod simple_io;
+pub mod simple_io;
 
 pub use device::{AccelerometerCalibration, AccelerometerData, WiimoteDevice};
 pub use extensions::*;

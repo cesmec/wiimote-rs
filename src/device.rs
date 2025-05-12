@@ -217,9 +217,11 @@ impl WiimoteDevice {
         self.motion_plus = None;
         self.extension = None;
 
-        self.calibration_data = self.read_calibration_data()?;
-        self.motion_plus = MotionPlus::detect(self)?;
         self.extension = WiimoteExtension::detect(self)?;
+        if !matches!(self.extension, Some(WiimoteExtension::BalanceBoard)) {
+            self.calibration_data = self.read_calibration_data()?;
+        }
+        self.motion_plus = MotionPlus::detect(self)?;
         Ok(())
     }
 

@@ -11,5 +11,5 @@ pub(super) const fn is_wiimote(vendor_id: u16, product_id: u16) -> bool {
 }
 
 pub(super) fn is_wiimote_device_name(name: &str) -> bool {
-    name == "Nintendo RVL-CNT-01" || name == "Nintendo RVL-CNT-01-TR"
+    name == "Nintendo RVL-CNT-01" || name == "Nintendo RVL-CNT-01-TR" || name == "Nintendo RVL-WBC-01"
 }

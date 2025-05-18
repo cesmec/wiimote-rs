@@ -16,6 +16,7 @@ A Rust library to communicate with Wii remotes over Bluetooth.
 - Receive data as input reports
 - Read accelerometer calibration and convert from raw values
 - Read motion plus calibration and convert from raw values
+- Read balance board calibration and convert from raw values
 
 ## Setup
 
@@ -100,7 +101,7 @@ use wiimote_rs::input::InputReport;
 
 fn read_accelerometer(device: Arc<Mutex<WiimoteDevice>>) -> WiimoteResult<()> {
     // The accelerometer calibration can be stored and reused per WiimoteDevice
-    let accelerometer_calibration = device.lock().unwrap().accelerometer_calibration().clone();
+    let accelerometer_calibration = device.lock().unwrap().accelerometer_calibration().unwrap().clone();
 
     let input_report = device.lock().unwrap().read()?;
     match input_report {

@@ -22,3 +22,16 @@ where
     (Into::<TResult>::into(value) - Into::<TResult>::into(zero))
         / (Into::<TResult>::into(max) - Into::<TResult>::into(zero))
 }
+
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    (1.0 - t).mul_add(a, b * t)
+}
+
+pub fn inverse_lerp(a: f32, b: f32, t: f32) -> f32 {
+    (t - a) / (b - a)
+}
+
+pub fn remap(value: f32, from_start: f32, from_end: f32, to_start: f32, to_end: f32) -> f32 {
+    let t = inverse_lerp(from_start, from_end, value);
+    lerp(to_start, to_end, t)
+}

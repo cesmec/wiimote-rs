@@ -33,7 +33,10 @@ fn main() -> WiimoteResult<()> {
                 println!("Motion plus: {:?}", wiimote.motion_plus());
                 println!("Extension: {:?}", wiimote.extension());
                 (
-                    wiimote.accelerometer_calibration().clone(),
+                    wiimote
+                        .accelerometer_calibration()
+                        .expect("Wiimote should have accelerometer calibration")
+                        .clone(),
                     wiimote.motion_plus().map(MotionPlus::calibration),
                 )
             };
@@ -46,7 +49,7 @@ fn main() -> WiimoteResult<()> {
                     handle_report(
                         &report,
                         &accelerometer_calibration,
-                        &motion_plus_calibration,
+                        motion_plus_calibration.as_ref(),
                         &d,
                     );
                 }
@@ -63,7 +66,7 @@ fn main() -> WiimoteResult<()> {
 fn handle_report(
     report: &InputReport,
     accelerometer_calibration: &AccelerometerCalibration,
-    motion_plus_calibration: &Option<MotionPlusCalibration>,
+    motion_plus_calibration: Option<&MotionPlusCalibration>,
     d: &Arc<Mutex<WiimoteDevice>>,
 ) {
     if let InputReport::StatusInformation(_) = report {

@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use crate::calibration::normalize;
-use crate::extensions::{MotionPlus, WiimoteExtension};
+use crate::extensions::{BalanceBoardCalibration, MotionPlus, WiimoteExtension};
 use crate::input::InputReport;
 use crate::native::{NativeWiimote, NativeWiimoteDevice};
 use crate::output::{Addressing, OutputReport};
@@ -65,11 +65,16 @@ impl AccelerometerData {
     }
 }
 
+enum Calibration {
+    Accelerometer(AccelerometerCalibration),
+    BalanceBoard(BalanceBoardCalibration),
+}
+
 /// A `WiimoteDevice` can be used to communicate with a Wii remote.
 pub struct WiimoteDevice {
     device: Mutex<Option<NativeWiimoteDevice>>,
     identifier: String,
-    calibration_data: AccelerometerCalibration,
+    calibration_data: Calibration,
     motion_plus: Option<MotionPlus>,
     extension: Option<WiimoteExtension>,
     rumble_enabled: AtomicBool,
@@ -89,7 +94,7 @@ impl WiimoteDevice {
         let mut wiimote = Self {
             device: Mutex::new(Some(device)),
             identifier,
-            calibration_data: AccelerometerCalibration::default(),
+            calibration_data: Calibration::Accelerometer(AccelerometerCalibration::default()),
             motion_plus: None,
             extension: None,
             rumble_enabled: AtomicBool::new(false),
@@ -106,10 +111,25 @@ impl WiimoteDevice {
     }
 
     /// Returns the accelerometer calibration data of the Wii remote.
-    /// This data is used to convert raw accelerometer data to acceleration values.
+    /// This calibration is used to convert raw accelerometer data to acceleration values.
     #[must_use]
-    pub const fn accelerometer_calibration(&self) -> &AccelerometerCalibration {
-        &self.calibration_data
+    pub const fn accelerometer_calibration(&self) -> Option<&AccelerometerCalibration> {
+        if let Calibration::Accelerometer(ref calibration) = self.calibration_data {
+            Some(calibration)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the balance board calibration data.
+    /// This calibration is used to convert raw balance board data to weights.
+    #[must_use]
+    pub const fn balance_board_calibration(&self) -> Option<&BalanceBoardCalibration> {
+        if let Calibration::BalanceBoard(ref calibration) = self.calibration_data {
+            Some(calibration)
+        } else {
+            None
+        }
     }
 
     /// Returns the `MotionPlus` extension of the Wii remote if connected.
@@ -218,14 +238,16 @@ impl WiimoteDevice {
         self.extension = None;
 
         self.extension = WiimoteExtension::detect(self)?;
-        if !matches!(self.extension, Some(WiimoteExtension::BalanceBoard)) {
-            self.calibration_data = self.read_calibration_data()?;
+        if matches!(self.extension, Some(WiimoteExtension::BalanceBoard)) {
+            self.calibration_data = Calibration::BalanceBoard(BalanceBoardCalibration::read(self)?);
+        } else {
+            self.calibration_data = Calibration::Accelerometer(self.read_calibration_data()?);
+            self.motion_plus = MotionPlus::detect(self)?;
         }
-        self.motion_plus = MotionPlus::detect(self)?;
         Ok(())
     }
 
-    fn read_calibration_data(&mut self) -> WiimoteResult<AccelerometerCalibration> {
+    fn read_calibration_data(&self) -> WiimoteResult<AccelerometerCalibration> {
         // https://www.wiibrew.org/wiki/Wiimote#EEPROM_Memory
         // The four bytes starting at 0x0016 and 0x0020 store the calibrated zero offsets for the accelerometer
         // (high 8 bits of X,Y,Z in the first three bytes, low 2 bits packed in the fourth byte as --XXYYZZ).

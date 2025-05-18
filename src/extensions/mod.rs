@@ -1,9 +1,11 @@
+pub(crate) mod balance_board;
 pub(crate) mod motion_plus;
 
 use crate::output::Addressing;
 use crate::prelude::*;
 use crate::simple_io;
 
+pub use balance_board::*;
 pub use motion_plus::*;
 
 #[derive(Debug)]

@@ -97,6 +97,13 @@ impl WiimoteManager {
 
     /// Scan for connected Wii remotes.
     fn scan(&mut self) -> Vec<MutexWiimoteDevice> {
+        // Cleanup manually disconnected devices to send them to the receiver again.
+        self.seen_devices.retain(|_, device| {
+            device
+                .try_lock()
+                .map_or(true, |d| !d.manually_disconnected())
+        });
+
         let mut native_devices = Vec::new();
         wiimotes_scan(&mut native_devices);
 

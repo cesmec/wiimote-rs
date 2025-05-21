@@ -135,13 +135,23 @@ pub(super) fn register_wiimotes_as_hid_devices() -> Result<(), String> {
     }
 }
 
-pub(super) fn forget_wiimote(identifier: &str) {
+pub(super) fn disconnect_wiimote(identifier: &str) {
     unsafe {
         let mut connected_wiimotes = match CONNECTED_WIIMOTES.lock() {
             Ok(connected_wiimotes) => connected_wiimotes,
             Err(connected_wiimotes) => connected_wiimotes.into_inner(),
         };
-        connected_wiimotes.remove(identifier);
+        if let Some(connected_wiimote) = connected_wiimotes.remove(identifier) {
+            _ = enumerate_bluetooth_radios(|radio, _radio_info| {
+                let hid_guid = HUMAN_INTERFACE_DEVICE_SERVICE_CLASS_ID.into();
+                BluetoothSetServiceState(
+                    radio,
+                    &connected_wiimote,
+                    &hid_guid,
+                    BLUETOOTH_SERVICE_DISABLE,
+                );
+            });
+        }
     }
 }
 

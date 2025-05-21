@@ -19,13 +19,15 @@ fn main() -> WiimoteResult<()> {
     new_devices.iter().try_for_each(|d| -> WiimoteResult<()> {
         std::thread::spawn(move || {
             let calibration = {
-                let wiimote = d.lock().unwrap();
+                let mut wiimote = d.lock().unwrap();
                 if matches!(wiimote.extension(), Some(WiimoteExtension::BalanceBoard)) {
                     wiimote
                         .balance_board_calibration()
                         .expect("Failed to read balance board calibration data")
                         .clone()
                 } else {
+                    // Automatically disconnect if device is not a balance board
+                    wiimote.disconnect();
                     return;
                 }
             };

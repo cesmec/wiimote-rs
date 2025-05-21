@@ -78,6 +78,7 @@ pub struct WiimoteDevice {
     motion_plus: Option<MotionPlus>,
     extension: Option<WiimoteExtension>,
     rumble_enabled: AtomicBool,
+    manually_disconnected: bool,
 }
 
 unsafe impl Sync for WiimoteDevice {}
@@ -98,6 +99,7 @@ impl WiimoteDevice {
             motion_plus: None,
             extension: None,
             rumble_enabled: AtomicBool::new(false),
+            manually_disconnected: false,
         };
 
         wiimote.initialize()?;
@@ -154,13 +156,21 @@ impl WiimoteDevice {
             .unwrap_or(false)
     }
 
+    /// Disconnects the Wii remote.
+    /// The Wii remote will show up again on the `WiimoteManager::new_devices_receiver` when reconnected.
+    pub fn disconnect(&mut self) {
+        self.manually_disconnected = true;
+        // Drop the native device to disconnect.
+        _ = self.device.lock().map(|mut device| device.take());
+    }
+
     /// Reconnects the Wii remote from a `NativeWiimoteDevice`.
     ///
     /// # Errors
     ///
     /// This function will return an error if the device is not a recognized Wii remote or the Wii remote failed to initialize.
-    pub fn reconnect(&mut self, device: NativeWiimoteDevice) -> WiimoteResult<()> {
-        self.disconnected();
+    pub(crate) fn reconnect(&mut self, device: NativeWiimoteDevice) -> WiimoteResult<()> {
+        self.drop_native_device();
         _ = self.device.lock().map(|mut d| d.replace(device));
         self.initialize()
     }
@@ -272,13 +282,18 @@ impl WiimoteDevice {
         })
     }
 
-    fn disconnected(&self) {
+    #[must_use]
+    pub(crate) const fn manually_disconnected(&self) -> bool {
+        self.manually_disconnected
+    }
+
+    fn drop_native_device(&self) {
         _ = self.device.lock().map(|mut device| device.take());
     }
 }
 
 impl Drop for WiimoteDevice {
     fn drop(&mut self) {
-        self.disconnected();
+        self.drop_native_device();
     }
 }
